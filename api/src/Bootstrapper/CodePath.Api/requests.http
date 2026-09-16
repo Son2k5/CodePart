@@ -1,0 +1,19 @@
+### Health check
+
+GET {{host}}/health
+Accept: application/json
+
+### Root
+
+GET {{host}}/
+Accept: application/json
+
+### Users module health
+
+GET {{host}}/api/users/health
+Accept: application/json
+
+### Auth module health
+
+GET {{host}}/api/auth/health
+Accept: application/json

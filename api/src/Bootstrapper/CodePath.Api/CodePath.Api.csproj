@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>CodePath.Api</RootNamespace>
+    <UserSecretsId>codepath-api-secrets</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="DotNetEnv" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Bootstrapper chỉ được reference lớp Api (Presentation) của từng module -->
+    <ProjectReference Include="..\..\Modules\Users\CodePath.Modules.Users.Api\CodePath.Modules.Users.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Auth\CodePath.Modules.Auth.Api\CodePath.Modules.Auth.Api.csproj" />
+    <ProjectReference Include="..\..\Shared\CodePath.Shared.Web\CodePath.Shared.Web.csproj" />
+  </ItemGroup>
+</Project>

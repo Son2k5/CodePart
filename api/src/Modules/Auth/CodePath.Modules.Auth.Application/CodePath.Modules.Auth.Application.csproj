@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>CodePath.Modules.Auth.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CodePath.Modules.Auth.Domain\CodePath.Modules.Auth.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\CodePath.Shared.Kernel\CodePath.Shared.Kernel.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+appsettings.Local.json
+*.db
+.env
+!.env.example
