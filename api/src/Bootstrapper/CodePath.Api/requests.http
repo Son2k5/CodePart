@@ -8,6 +8,11 @@ Accept: application/json
 GET {{host}}/
 Accept: application/json
 
+### Redis health check (Round-trip test)
+
+GET {{host}}/health/redis
+Accept: application/json
+
 ### Users module health
 
 GET {{host}}/api/users/health

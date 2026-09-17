@@ -18,8 +18,12 @@ services:
     image: redis:7-alpine
     container_name: codepath-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
+    volumes:
+      - codepath-redis-data:/data
 
 volumes:
   codepath-pgdata:
+  codepath-redis-data:

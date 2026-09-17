@@ -38,5 +38,9 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="FluentAssertions" Version="6.12.1" />
     <PackageVersion Include="Moq" Version="4.20.72" />
+
+        <!-- Caching / Redis -->
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
+
   </ItemGroup>
 </Project>
