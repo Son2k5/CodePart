@@ -10,7 +10,8 @@
     <PackageReference Include="FluentAssertions" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Modules\Users\CodePath.Modules.Users.Domain\CodePath.Modules.Users.Domain.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Users\CodePath.Modules.Users.Application\CodePath.Modules.Users.Application.csproj" />
+    <ProjectReference Include="..\..\src\Domain\CodePath.Domain\CodePath.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Application\CodePath.Application\CodePath.Application.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\CodePath.Infrastructure\CodePath.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

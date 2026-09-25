@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>CodePath.Modules.Users.Domain</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\Shared\CodePath.Shared.Kernel\CodePath.Shared.Kernel.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>CodePath.Api</RootNamespace>
+    <UserSecretsId>codepath-api-secrets</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="DotNetEnv" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Application\CodePath.Application\CodePath.Application.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\CodePath.Infrastructure\CodePath.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Shared\CodePath.Shared.Web\CodePath.Shared.Web.csproj" />
+  </ItemGroup>
+</Project>

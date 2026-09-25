@@ -1,47 +1,41 @@
-# CodePath - Kien truc Modular Monolith
+# CodePath - Kiến trúc Layered Clean Architecture
 
-## 1. Brut cuc
+## 1. Bố cục thư mục (Layered Clean Architecture)
 
 ```text
 src/
-  Bootstrapper/CodePath.Api      # Composition Root, chi biet IModule
+  Api/CodePath.Api              # Presentation / Web API (Endpoints, Contracts, Program.cs)
+  Application/CodePath.Application  # Business logic (Commands, Queries, Handlers, Validators, DTOs, Abstractions)
+  Domain/CodePath.Domain        # Entities, Enums, Domain Exceptions (thuần domain, không dependency ra ngoài)
+  Infrastructure/CodePath.Infrastructure # EF Core DbContexts, Configurations, Migrations, External Services
   Shared/
-    CodePath.Shared.Kernel       # BaseEntity, Result, Events, Exceptions (thuan domain)
-    CodePath.Shared.Web          # IModule, ValidationBehavior, Exception/Swagger
-  Modules/{Module}/
-    {Module}.Domain              # Entity, Enum, Exception, Event
-    {Module}.Application         # Abstractions, Contracts (public), Features (internal), DI
-    {Module}.Infrastructure      # DbContext (schema rieng), Configurations, Migrations, DI
-    {Module}.Api                 # Module.cs, Endpoints, Contracts (Request/Response)
+    CodePath.Shared.Kernel      # BaseEntity, Result, Events, Exceptions
+    CodePath.Shared.Web         # Web helpers: Swagger, ExceptionHandling, Redis
+  Tools/
+    CodePath.Migrator           # Tool chạy Database Migrations độc lập
 tests/
-  CodePath.Architecture.Tests    # Quy uoc module boundary
+  CodePath.Architecture.Tests   # Kiểm tra quy ước kiến trúc
 ```
 
-## 2. Quy uoc phu thuoc (Clean Architecture)
+## 2. Quy ước phụ thuộc (Clean Architecture)
 
 - `Api -> Application + Infrastructure + Shared.Web`
 - `Infrastructure -> Application`
 - `Application -> Domain + Shared.Kernel`
 - `Domain -> Shared.Kernel`
-- `Bootstrapper -> *.Api + Shared.Web` (khong ref thang Application/Infrastructure/Domain)
-- Cam `ProjectReference` cheo `Domain/Infrastructure` giua cac module.
+- Chiều phụ thuộc luôn đi một chiều vào trong: `Domain` và `Shared.Kernel` không phụ thuộc bất kỳ layer nào bên ngoài.
 
-## 3. Handler-cross (CQRS, cam Service)
+## 3. CQRS & Mapping
 
-- Cam `Services/*Service.cs` trong `*.Application`.
-- Moi usecase la `Command/Query + Handler + Validator` (MediatR).
-- `Contracts/` chua `public record : IRequest<T>` + `DTO`. Module khac goi qua `ISender.Send()`.
-- `Features/` chua `internal Handler + Validator`.
-- Khong doc `DbContext` / `Domain.Entity` cua module khac.
+- Sử dụng CQRS (Command/Query separation) với MediatR.
+- `Application/{Feature}/Commands/`: Chứa Command, Handler, Validator.
+- `Application/{Feature}/Queries/`: Chứa Query, Handler.
+- `Application/{Feature}/Dtos/`: Chứa DTOs (`sealed record`) và manual mapping extension methods (`user.ToUserAuthDto()`).
+- Bỏ hoàn toàn AutoMapper, sử dụng manual mapping thuần túy.
 
-## 4. Du lieu
+## 4. Dữ liệu & Persistence
 
-- Moi module 1 `DbContext` + 1 schema Postgres rieng (`users`, `problems`, ...).
-- Chung 1 physical database, `MigrationsHistoryTable` rieng tung schema.
-- FK lien module chi luu `Guid` thuan, khong navigation cross-module.
-
-## 5. Them module moi
-
-1. Tao 4 project theo mau `Modules/Users`.
-2. Tao `*Module : IModule`, `*DbContext`, `DependencyInjection`.
-3. Them `ProjectReference` vao `CodePath.Api.csproj` + `new XModule()` vao `Program.cs` + `.sln`.
+- Các DbContext tách schema rõ ràng (`auth`, `users`).
+- Entity configurations được phân lập theo namespace để tránh cross-schema configuration.
+- `IDbContext` abstractions (`IAuthDbContext`, `IUsersDbContext`) đặt tại `Application/{Feature}/Abstractions`.
+- `DbContext` implementations đặt tại `Infrastructure/{Feature}/Persistence`.
