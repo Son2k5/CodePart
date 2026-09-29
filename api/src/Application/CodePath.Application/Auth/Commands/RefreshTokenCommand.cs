@@ -5,7 +5,6 @@ using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using FluentValidation;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace CodePath.Application.Auth.Commands;
 
@@ -36,22 +35,19 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
     {
         var tokenHash = _jwtTokenService.HashRefreshToken(request.RefreshToken);
 
-        var existingToken = await _authDbContext.RefreshTokens
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, cancellationToken);
+        var existingToken = await _authDbContext.GetRefreshTokenAsync(tokenHash, cancellationToken);
 
         if (existingToken is null)
         {
-            return Result<LoginResponse>.Failure("Refresh token không hợp lệ.");
+            return Result<LoginResponse>.Failure("Refresh token không hợp lệ.", ErrorCodes.Unauthorized);
         }
 
         if (existingToken.IsRevoked)
         {
-            var timeSinceRevoked = DateTime.UtcNow - existingToken.RevokedAt!.Value;
-
-            if (timeSinceRevoked <= TimeSpan.FromSeconds(30) && !string.IsNullOrWhiteSpace(existingToken.ReplacedByTokenHash))
+            if (existingToken.IsWithinReuseGracePeriod())
             {
-                var activeReplacement = await _authDbContext.RefreshTokens
-                    .FirstOrDefaultAsync(t => t.TokenHash == existingToken.ReplacedByTokenHash && t.RevokedAt == null, cancellationToken);
+                var activeReplacement = await _authDbContext.GetActiveRefreshTokenAsync(
+                    existingToken.ReplacedByTokenHash!, cancellationToken);
 
                 if (activeReplacement != null && !activeReplacement.IsExpired)
                 {
@@ -62,12 +58,11 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
                         var freshTokens = _jwtTokenService.GenerateTokens(u.Id, u.Email, u.Role, u.Status);
                         var freshTokenHash = _jwtTokenService.HashRefreshToken(freshTokens.RefreshToken);
 
-                        var branchToken = RefreshToken.Create(
+                        var branchToken = RefreshToken.CreateWithDefaultLifetime(
                             u.Id,
-                            freshTokenHash,
-                            DateTime.UtcNow.AddDays(7));
+                            freshTokenHash);
 
-                        await _authDbContext.RefreshTokens.AddAsync(branchToken, cancellationToken);
+                        await _authDbContext.AddRefreshTokenAsync(branchToken, cancellationToken);
                         await _authDbContext.SaveChangesAsync(cancellationToken);
 
                         return Result<LoginResponse>.Success(new LoginResponse(
@@ -78,9 +73,7 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
                 }
             }
 
-            var userTokens = await _authDbContext.RefreshTokens
-                .Where(t => t.UserId == existingToken.UserId && t.RevokedAt == null)
-                .ToListAsync(cancellationToken);
+            var userTokens = await _authDbContext.GetActiveUserTokensAsync(existingToken.UserId, cancellationToken);
 
             foreach (var t in userTokens)
             {
@@ -88,18 +81,18 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
             }
 
             await _authDbContext.SaveChangesAsync(cancellationToken);
-            return Result<LoginResponse>.Failure("Cảnh báo bảo mật: Token đã thu hồi bị sử dụng lại ngoài thời gian cho phép. Mọi phiên làm việc đã bị hủy.");
+            return Result<LoginResponse>.Failure("Cảnh báo bảo mật: Token đã thu hồi bị sử dụng lại ngoài thời gian cho phép. Mọi phiên làm việc đã bị hủy.", ErrorCodes.Unauthorized);
         }
 
         if (existingToken.IsExpired)
         {
-            return Result<LoginResponse>.Failure("Refresh token đã hết hạn. Vui lòng đăng nhập lại.");
+            return Result<LoginResponse>.Failure("Refresh token đã hết hạn. Vui lòng đăng nhập lại.", ErrorCodes.Unauthorized);
         }
 
         var userResult = await _sender.Send(new GetUserByIdQuery(existingToken.UserId), cancellationToken);
         if (!userResult.IsSuccess || userResult.Value is null || userResult.Value.Status != UserStatus.Active)
         {
-            return Result<LoginResponse>.Failure("Người dùng không hợp lệ hoặc không ở trạng thái Active.");
+            return Result<LoginResponse>.Failure("Người dùng không hợp lệ hoặc không ở trạng thái Active.", ErrorCodes.Forbidden);
         }
 
         var user = userResult.Value;
@@ -109,12 +102,11 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
 
         existingToken.Revoke(replacedByTokenHash: newTokenHash);
 
-        var newRefreshToken = RefreshToken.Create(
+        var newRefreshToken = RefreshToken.CreateWithDefaultLifetime(
             user.Id,
-            newTokenHash,
-            DateTime.UtcNow.AddDays(7));
+            newTokenHash);
 
-        await _authDbContext.RefreshTokens.AddAsync(newRefreshToken, cancellationToken);
+        await _authDbContext.AddRefreshTokenAsync(newRefreshToken, cancellationToken);
         await _authDbContext.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(new LoginResponse(

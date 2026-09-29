@@ -1,3 +1,5 @@
+using System.Reflection;
+using CodePath.Shared.Kernel.Common;
 using FluentValidation;
 using MediatR;
 
@@ -23,7 +25,23 @@ public sealed class ValidationBehavior<TRequest, TResponse>(IEnumerable<IValidat
             .ToList();
 
         if (failures.Count != 0)
+        {
+            var errors = failures.Select(f => new ValidationError(f.PropertyName, f.ErrorMessage)).ToList();
+
+            if (typeof(TResponse).IsGenericType && typeof(TResponse).GetGenericTypeDefinition() == typeof(Result<>))
+            {
+                var method = typeof(TResponse).GetMethod(
+                    nameof(Result<object>.ValidationFailure),
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (method != null)
+                {
+                    return (TResponse)method.Invoke(null, [errors])!;
+                }
+            }
+
             throw new ValidationException(failures);
+        }
 
         return await next();
     }

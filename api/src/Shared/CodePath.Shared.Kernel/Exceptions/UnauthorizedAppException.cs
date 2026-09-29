@@ -1,3 +1,3 @@
 namespace CodePath.Shared.Kernel.Exceptions;
 
-public sealed class UnauthorizedAppException(string message) : AppException(message);
+public sealed class UnauthorizedAppException(string message) : AppException(message, "UNAUTHORIZED");

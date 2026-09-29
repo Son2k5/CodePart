@@ -1,4 +1,5 @@
 using CodePath.Application.Auth.Abstractions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace CodePath.Infrastructure.Auth.Services;
@@ -6,11 +7,25 @@ namespace CodePath.Infrastructure.Auth.Services;
 public sealed class EmailSender : IEmailSender
 {
     private readonly ILogger<EmailSender> _logger;
-    public EmailSender(ILogger<EmailSender> logger) => _logger = logger;
+    private readonly IHostEnvironment _env;
+
+    public EmailSender(ILogger<EmailSender> logger, IHostEnvironment env)
+    {
+        _logger = logger;
+        _env = env;
+    }
 
     public Task SendOtpEmailAsync(string toEmail, string otp, CancellationToken ct = default)
     {
-        _logger.LogInformation("[MOCK-EMAIL] Gửi mã OTP xác thực tới {ToEmail}: {Otp}", toEmail, otp);
+        if (_env.IsDevelopment())
+        {
+            _logger.LogDebug("[DEV-MOCK-EMAIL] Gửi mã OTP xác thực tới {ToEmail}: {Otp}", toEmail, otp);
+        }
+        else
+        {
+            _logger.LogInformation("Gửi mã OTP xác thực tới {ToEmail} thành công.", toEmail);
+        }
+
         return Task.CompletedTask;
     }
 }

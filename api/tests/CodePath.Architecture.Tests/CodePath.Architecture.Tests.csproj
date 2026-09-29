@@ -13,5 +13,7 @@
     <ProjectReference Include="..\..\src\Domain\CodePath.Domain\CodePath.Domain.csproj" />
     <ProjectReference Include="..\..\src\Application\CodePath.Application\CodePath.Application.csproj" />
     <ProjectReference Include="..\..\src\Infrastructure\CodePath.Infrastructure\CodePath.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Shared\CodePath.Shared.Kernel\CodePath.Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Api\CodePath.Api\CodePath.Api.csproj" />
   </ItemGroup>
 </Project>

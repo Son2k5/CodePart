@@ -1,7 +1,6 @@
 using CodePath.Application.Auth.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace CodePath.Application.Auth.Commands;
 
@@ -28,8 +27,7 @@ internal sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Resu
         if (!string.IsNullOrWhiteSpace(request.RefreshToken))
         {
             var hash = _jwtTokenService.HashRefreshToken(request.RefreshToken);
-            var token = await _authDbContext.RefreshTokens
-                .FirstOrDefaultAsync(t => t.TokenHash == hash && t.UserId == request.CurrentUserId, cancellationToken);
+            var token = await _authDbContext.GetUserRefreshTokenAsync(hash, request.CurrentUserId, cancellationToken);
 
             if (token != null && !token.IsRevoked)
             {

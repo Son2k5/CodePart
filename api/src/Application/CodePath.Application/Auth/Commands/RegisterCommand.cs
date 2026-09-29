@@ -5,6 +5,7 @@ using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace CodePath.Application.Auth.Commands;
 
@@ -37,18 +38,21 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
     private readonly IPasswordHasher _passwordHasher;
     private readonly IOtpService _otpService;
     private readonly IEmailSender _emailSender;
+    private readonly ILogger<RegisterCommandHandler> _logger;
     private static readonly Regex StudentRegex = new(@"^\d+@hanu\.edu\.vn$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public RegisterCommandHandler(
         ISender sender,
         IPasswordHasher passwordHasher,
         IOtpService otpService,
-        IEmailSender emailSender)
+        IEmailSender emailSender,
+        ILogger<RegisterCommandHandler> logger)
     {
         _sender = sender;
         _passwordHasher = passwordHasher;
         _otpService = otpService;
         _emailSender = emailSender;
+        _logger = logger;
     }
 
     public async Task<Result<string>> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -83,7 +87,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
 
         if (!createResult.IsSuccess)
         {
-            return Result<string>.Failure(createResult.Error ?? "Đăng ký không thành công.");
+            return Result<string>.Failure(createResult.Error ?? "Đăng ký không thành công.", createResult.ErrorCode ?? ErrorCodes.BadRequest);
         }
 
         try
@@ -92,9 +96,10 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
             await _emailSender.SendOtpEmailAsync(normalizedEmail, otp, cancellationToken);
             return Result<string>.Success("Đăng ký tài khoản thành công. Vui lòng kiểm tra email để nhận mã OTP xác thực.");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return Result<string>.Success("Tài khoản đã được tạo thành công nhưng hệ thống gặp sự cố khi gửi mã OTP. Vui lòng bấm 'Gửi lại OTP' để nhận mã xác thực.");
+            _logger.LogError(ex, "Sự cố gửi mã OTP kích hoạt tài khoản cho {Email}", normalizedEmail);
+            return Result<string>.Failure("Tài khoản đã được tạo nhưng hệ thống gặp sự cố khi gửi mã OTP. Vui lòng bấm 'Gửi lại OTP' để nhận mã xác thực.", ErrorCodes.InfraError);
         }
     }
 }

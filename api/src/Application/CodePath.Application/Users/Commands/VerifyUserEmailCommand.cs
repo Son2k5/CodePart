@@ -1,3 +1,4 @@
+using CodePath.Application.Users.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using MediatR;
 

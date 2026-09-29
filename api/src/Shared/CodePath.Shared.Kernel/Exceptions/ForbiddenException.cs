@@ -2,10 +2,11 @@ namespace CodePath.Shared.Kernel.Exceptions;
 
 public class ForbiddenException : AppException
 {
-    public string ErrorCode { get; }
-
-    public ForbiddenException(string errorCode, string message) : base(message)
+    public ForbiddenException(string message, string errorCode = "FORBIDDEN") : base(message, errorCode)
     {
-        ErrorCode = errorCode;
+    }
+
+    public ForbiddenException(string errorCode, string message, bool _) : base(message, errorCode)
+    {
     }
 }

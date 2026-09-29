@@ -47,10 +47,10 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        var userResult = await _sender.Send(new GetUserByEmailQuery(normalizedEmail), cancellationToken);
+        var userResult = await _sender.Send(new GetUserCredentialsByEmailQuery(normalizedEmail), cancellationToken);
         if (!userResult.IsSuccess || userResult.Value is null)
         {
-            _passwordHasher.VerifyPassword("dummy", "$2a$12$e8vT9gXhM4kE4D.B1G8q2.j3l5oG7m9qP1rS3tU5vW7xY9zA1bC3e");
+            _passwordHasher.SimulateVerification();
             return Result<LoginResponse>.Failure(GenericAuthErrorMessage, "UNAUTHORIZED");
         }
 
@@ -86,12 +86,11 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
         var tokens = _jwtTokenService.GenerateTokens(user.Id, user.Email, user.Role, user.Status);
         var tokenHash = _jwtTokenService.HashRefreshToken(tokens.RefreshToken);
 
-        var refreshTokenEntity = RefreshToken.Create(
+        var refreshTokenEntity = RefreshToken.CreateWithDefaultLifetime(
             user.Id,
-            tokenHash,
-            DateTime.UtcNow.AddDays(7));
+            tokenHash);
 
-        await _authDbContext.RefreshTokens.AddAsync(refreshTokenEntity, cancellationToken);
+        await _authDbContext.AddRefreshTokenAsync(refreshTokenEntity, cancellationToken);
         await _authDbContext.SaveChangesAsync(cancellationToken);
 
         return Result<LoginResponse>.Success(new LoginResponse(

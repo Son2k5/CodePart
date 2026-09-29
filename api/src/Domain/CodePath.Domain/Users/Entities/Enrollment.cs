@@ -1,3 +1,4 @@
+using CodePath.Domain.Common.Exceptions;
 using CodePath.Shared.Kernel.Entities;
 using CodePath.Domain.Users.Enums;
 
@@ -22,8 +23,10 @@ public sealed class Enrollment : BaseEntity
 
     public static Enrollment Create(Guid courseId, Guid studentId)
     {
-        if (courseId == Guid.Empty) throw new ArgumentException("Course ID cannot be empty.", nameof(courseId));
-        if (studentId == Guid.Empty) throw new ArgumentException("Student ID cannot be empty.", nameof(studentId));
+        if (courseId == Guid.Empty)
+            throw new DomainValidationException("Course ID cannot be empty.", nameof(courseId));
+        if (studentId == Guid.Empty)
+            throw new DomainValidationException("Student ID cannot be empty.", nameof(studentId));
 
         return new Enrollment
         {
@@ -37,11 +40,11 @@ public sealed class Enrollment : BaseEntity
     public void UpdateScores(decimal midtermScore, decimal finalScore, decimal midtermWeight = 0.4m)
     {
         if (midtermScore is < 0 or > 10)
-            throw new ArgumentOutOfRangeException(nameof(midtermScore), "Midterm score must be between 0 and 10.");
+            throw new DomainValidationException("Midterm score must be between 0 and 10.", nameof(midtermScore));
         if (finalScore is < 0 or > 10)
-            throw new ArgumentOutOfRangeException(nameof(finalScore), "Final score must be between 0 and 10.");
+            throw new DomainValidationException("Final score must be between 0 and 10.", nameof(finalScore));
         if (midtermWeight is <= 0 or >= 1)
-            throw new ArgumentOutOfRangeException(nameof(midtermWeight), "Weight must be between 0 and 1.");
+            throw new DomainValidationException("Weight must be between 0 and 1.", nameof(midtermWeight));
 
         MidtermScore = midtermScore;
         FinalScore = finalScore;
@@ -60,7 +63,7 @@ public sealed class Enrollment : BaseEntity
     public void Drop()
     {
         if (Status == EnrollmentStatus.Completed)
-            throw new InvalidOperationException("Cannot drop a completed course.");
+            throw new DomainRuleViolationException("Cannot drop a completed course.");
 
         Status = EnrollmentStatus.Dropped;
         Touch();

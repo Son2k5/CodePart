@@ -12,10 +12,23 @@ public static class UserMappingExtensions
             user.Id,
             user.Email,
             user.FullName,
-            user.PasswordHash,
             user.Role,
             user.Status,
             user.StudentId,
+            user.EmailVerifiedAt);
+    }
+
+    public static UserCredentialsDto ToUserCredentialsDto(this User user)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        return new UserCredentialsDto(
+            user.Id,
+            user.Email,
+            user.FullName,
+            user.PasswordHash,
+            user.Role,
+            user.Status,
             user.EmailVerifiedAt);
     }
 }

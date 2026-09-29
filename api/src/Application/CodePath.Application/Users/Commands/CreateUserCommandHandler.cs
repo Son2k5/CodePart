@@ -4,8 +4,6 @@ using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using CodePath.Shared.Kernel.Exceptions;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace CodePath.Application.Users.Commands;
 
@@ -22,12 +20,12 @@ internal sealed class CreateUserCommandHandler : IRequestHandler<CreateUserComma
     {
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
-        var existingUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+        var existingUser = await _dbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUser != null)
         {
             if (existingUser.EmailVerifiedAt.HasValue)
             {
-                throw new ConflictException("Email already exists in the system.");
+                return Result<Guid>.Failure("Email đã tồn tại trong hệ thống.", ErrorCodes.Conflict);
             }
 
             existingUser.UpdateUnverifiedAccount(request.FullName, request.PasswordHash, request.Role, request.StudentId);
@@ -43,15 +41,17 @@ internal sealed class CreateUserCommandHandler : IRequestHandler<CreateUserComma
             _ => throw new ArgumentOutOfRangeException(nameof(request.Role))
         };
 
+        // UniqueViolation (email/studentId) được Infrastructure/UsersDbContext.SaveChangesAsync
+        // chuyển thành ConflictException → Application bắt và chuyển sang Result.Failure
         try
         {
-            await _dbContext.Users.AddAsync(user, cancellationToken);
+            await _dbContext.AddAsync(user, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return Result<Guid>.Success(user.Id);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == PostgresErrorCodes.UniqueViolation)
+        catch (ConflictException ex)
         {
-            throw new ConflictException("Email or student code already exists.");
+            return Result<Guid>.Failure(ex.Message, ErrorCodes.Conflict);
         }
     }
 }

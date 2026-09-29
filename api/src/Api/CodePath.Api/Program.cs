@@ -1,17 +1,19 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using CodePath.Api.Endpoints;
+using CodePath.Api.Extensions;
 using CodePath.Application;
 using CodePath.Application.Auth.Abstractions;
-using CodePath.Infrastructure.Auth.Authorization;
+using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
+using CodePath.Shared.Web.Authorization;
 using CodePath.Shared.Web.Extensions;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using StackExchange.Redis;
 
 Env.TraversePath().Load();
 
@@ -20,8 +22,11 @@ builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddSharedInfrastructure(builder.Configuration);
 
-var jwtSecret = builder.Configuration["Jwt:SigningKey"] 
-    ?? "REPLACE_THIS_WITH_A_LONG_RANDOM_SECRET_AT_LEAST_64_CHARS_DEFAULT_DEV_KEY";
+var jwtSecret = builder.Configuration["Jwt:SigningKey"];
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 64)
+{
+    throw new InvalidOperationException("Jwt:SigningKey is missing or less than 64 characters in configuration.");
+}
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "CodePath.Api";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "CodePath.Client";
 
@@ -52,6 +57,43 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 {
                     context.Fail("Token has been revoked.");
                 }
+            },
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/problem+json";
+
+                var problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = "Không được phép truy cập",
+                    Detail = context.ErrorDescription ?? "Token không hợp lệ, đã hết hạn hoặc bị thu hồi.",
+                    Type = "https://httpstatuses.com/401",
+                    Instance = context.HttpContext.Request.Path
+                };
+                problem.Extensions["code"] = ErrorCodes.Unauthorized;
+                problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+
+                await context.Response.WriteAsJsonAsync(problem);
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/problem+json";
+
+                var problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status403Forbidden,
+                    Title = "Truy cập bị từ chối",
+                    Detail = "Bạn không có quyền truy cập tài nguyên này.",
+                    Type = "https://httpstatuses.com/403",
+                    Instance = context.HttpContext.Request.Path
+                };
+                problem.Extensions["code"] = ErrorCodes.Forbidden;
+                problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+
+                await context.Response.WriteAsJsonAsync(problem);
             }
         };
     });
@@ -61,12 +103,22 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-            ?? new[] { "http://localhost:3000", "http://localhost:5173" };
+            ?? Array.Empty<string>();
 
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
     });
 });
 
@@ -88,6 +140,24 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/problem+json";
+
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status429TooManyRequests,
+            Title = "Quá nhiều yêu cầu",
+            Detail = "Bạn đã gửi quá nhiều yêu cầu trong thời gian ngắn. Vui lòng thử lại sau.",
+            Type = "https://httpstatuses.com/429",
+            Instance = context.HttpContext.Request.Path
+        };
+        problem.Extensions["code"] = "RATE_LIMIT_EXCEEDED";
+        problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+
+        await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken);
+    };
 
     options.AddPolicy("auth-rate-limit", httpContext =>
     {
@@ -119,7 +189,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseAppExceptionHandling();
+// Auto-migration via Program API (thay thế Tool CodePath.Migrator độc lập).
+// Domain owns constraints qua IEntityTypeConfiguration, Api orchestrate MigrateAsync().
+await app.MigrateDatabasesAsync();
 
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
@@ -128,19 +200,26 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();
 
-var proxySubnet = builder.Configuration["ReverseProxy:KnownNetwork"] ?? "172.16.0.0/12";
-var subnetParts = proxySubnet.Split('/');
-if (subnetParts.Length == 2 && System.Net.IPAddress.TryParse(subnetParts[0], out var ip) && int.TryParse(subnetParts[1], out var prefix))
+var proxyNetworks = builder.Configuration.GetSection("ReverseProxy:KnownNetworks").Get<string[]>()
+    ?? (builder.Configuration["ReverseProxy:KnownNetwork"] is not null
+        ? new[] { builder.Configuration["ReverseProxy:KnownNetwork"]! }
+        : Array.Empty<string>());
+
+foreach (var net in proxyNetworks)
 {
-    forwardedHeadersOptions.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
-}
-else
-{
-    forwardedHeadersOptions.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12));
-    forwardedHeadersOptions.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8));
+    var subnetParts = net.Split('/');
+    if (subnetParts.Length == 2 && System.Net.IPAddress.TryParse(subnetParts[0], out var ip) && int.TryParse(subnetParts[1], out var prefix))
+    {
+        forwardedHeadersOptions.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
+    }
 }
 
 app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// CORS đặt trước AppExceptionHandling để mọi response lỗi 4xx/5xx vẫn luôn có CORS headers
+app.UseCors();
+
+app.UseAppExceptionHandling();
 
 if (app.Environment.IsDevelopment())
 {
@@ -149,8 +228,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-app.UseCors();
 
 app.UseRateLimiter();
 
@@ -163,37 +240,27 @@ app.MapGet("/", () => Results.Ok(new { service = "CodePath API", status = "healt
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
    .ExcludeFromDescription();
 
-app.MapGet("/health/redis", async (IConnectionMultiplexer redis) =>
+app.MapGet("/health/redis", async (IRedisHealthProbe probe, IWebHostEnvironment env, CancellationToken ct) =>
 {
-    if (!redis.IsConnected)
+    var health = await probe.CheckAsync(ct);
+    if (!health.IsConnected)
     {
         return Results.Problem(
-            detail: "Cannot connect to Redis server.",
+            detail: env.IsDevelopment() ? (health.Error ?? "Cannot connect to Redis server.") : "Cannot connect to cache service.",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 
-    var db = redis.GetDatabase();
-    var testKey = "codepath:healthcheck";
-    var testValue = $"ping_{Guid.NewGuid():N}";
-
-    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    await db.StringSetAsync(testKey, testValue, TimeSpan.FromSeconds(60));
-    var retrievedValue = await db.StringGetAsync(testKey);
-    stopwatch.Stop();
-    await db.KeyDeleteAsync(testKey);
-
-    var isRoundTripSuccess = (retrievedValue == testValue);
-    return isRoundTripSuccess
+    return health.RoundTripSuccess
         ? Results.Ok(new
         {
             service = "Redis",
             status = "healthy",
             roundTripSuccess = true,
-            latencyMs = stopwatch.ElapsedMilliseconds,
-            endpoint = redis.GetEndPoints().FirstOrDefault()?.ToString()
+            latencyMs = health.LatencyMs,
+            endpoint = env.IsDevelopment() ? health.Endpoint : "protected"
         })
         : Results.Problem(
-            detail: "Redis round-trip verification failed (value mismatch).",
+            detail: env.IsDevelopment() ? (health.Error ?? "Redis round-trip verification failed (value mismatch).") : "Cache verification failed.",
             statusCode: StatusCodes.Status500InternalServerError);
 })
 .WithName("CheckRedisHealth")

@@ -18,6 +18,13 @@ public sealed class RefreshToken : BaseEntity
 
     private RefreshToken() { }
 
+    public static readonly TimeSpan DefaultLifetime = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// Grace period cho phép retry sau khi token vừa bị rotate (chống race khi client gửi song song 2 request).
+    /// </summary>
+    public static readonly TimeSpan ReuseGracePeriod = TimeSpan.FromSeconds(30);
+
     public static RefreshToken Create(
         Guid userId,
         string tokenHash,
@@ -36,6 +43,18 @@ public sealed class RefreshToken : BaseEntity
             CreatedAt = DateTime.UtcNow
         };
     }
+
+    public static RefreshToken CreateWithDefaultLifetime(Guid userId, string tokenHash, string? createdByIp = null)
+        => Create(userId, tokenHash, DateTime.UtcNow.Add(DefaultLifetime), createdByIp);
+
+    /// <summary>
+    /// True nếu token vừa bị revoke trong grace period và có replacement → cho phép retry (chống race parallel request).
+    /// </summary>
+    public bool IsWithinReuseGracePeriod()
+        => IsRevoked
+        && RevokedAt.HasValue
+        && (DateTime.UtcNow - RevokedAt.Value) <= ReuseGracePeriod
+        && !string.IsNullOrWhiteSpace(ReplacedByTokenHash);
 
     public void Revoke(string? revokedByIp = null, string? replacedByTokenHash = null)
     {

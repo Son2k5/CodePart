@@ -3,24 +3,25 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using CodePath.Application.Auth.Abstractions;
+using CodePath.Infrastructure.Auth.Options;
 using CodePath.Shared.Kernel.Enums;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CodePath.Infrastructure.Auth.Services;
 
 public sealed class JwtTokenService : IJwtTokenService
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _options;
 
-    public JwtTokenService(IConfiguration configuration) => _configuration = configuration;
+    public JwtTokenService(IOptions<JwtOptions> options) => _options = options.Value;
 
     public GeneratedTokens GenerateTokens(Guid userId, string email, UserRole role, UserStatus status)
     {
-        var secret = _configuration["Jwt:SigningKey"] ?? throw new InvalidOperationException("Jwt:SigningKey is missing.");
-        var issuer = _configuration["Jwt:Issuer"] ?? "CodePath.Api";
-        var audience = _configuration["Jwt:Audience"] ?? "CodePath.Client";
-        var expiryMinutes = int.TryParse(_configuration["Jwt:AccessTokenExpiryMinutes"], out var mins) ? mins : 15;
+        var secret = _options.SigningKey;
+        var issuer = _options.Issuer;
+        var audience = _options.Audience;
+        var expiryMinutes = _options.AccessTokenExpiryMinutes;
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.UTF8.GetBytes(secret);

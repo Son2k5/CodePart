@@ -1,3 +1,4 @@
+using CodePath.Domain.Common.Exceptions;
 using CodePath.Shared.Kernel.Entities;
 using CodePath.Domain.Users.Enums;
 
@@ -29,13 +30,20 @@ public sealed class Course : BaseEntity
         Guid teacherId,
         int maxCapacity = 60)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(subjectName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sectionCode);
-        ArgumentException.ThrowIfNullOrWhiteSpace(language);
-        ArgumentException.ThrowIfNullOrWhiteSpace(semester);
-        ArgumentException.ThrowIfNullOrWhiteSpace(joinCode);
-        if (teacherId == Guid.Empty) throw new ArgumentException("Teacher ID cannot be empty.", nameof(teacherId));
-        if (maxCapacity <= 0) throw new ArgumentOutOfRangeException(nameof(maxCapacity), "Max capacity must be greater than 0.");
+        if (string.IsNullOrWhiteSpace(subjectName))
+            throw new DomainValidationException("Tên môn học không được để trống.", nameof(subjectName));
+        if (string.IsNullOrWhiteSpace(sectionCode))
+            throw new DomainValidationException("Mã lớp học phần không được để trống.", nameof(sectionCode));
+        if (string.IsNullOrWhiteSpace(language))
+            throw new DomainValidationException("Ngôn ngữ không được để trống.", nameof(language));
+        if (string.IsNullOrWhiteSpace(semester))
+            throw new DomainValidationException("Học kỳ không được để trống.", nameof(semester));
+        if (string.IsNullOrWhiteSpace(joinCode))
+            throw new DomainValidationException("Mã tham gia không được để trống.", nameof(joinCode));
+        if (teacherId == Guid.Empty)
+            throw new DomainValidationException("Teacher ID cannot be empty.", nameof(teacherId));
+        if (maxCapacity <= 0)
+            throw new DomainValidationException("Max capacity must be greater than 0.", nameof(maxCapacity));
 
         return new Course
         {
@@ -54,7 +62,7 @@ public sealed class Course : BaseEntity
     public void Activate()
     {
         if (Status == CourseStatus.Active)
-            throw new InvalidOperationException("Course is already active.");
+            throw new DomainRuleViolationException("Course is already active.");
 
         Status = CourseStatus.Active;
         Touch();
@@ -69,7 +77,7 @@ public sealed class Course : BaseEntity
     public void AssignTeacher(Guid teacherId)
     {
         if (teacherId == Guid.Empty)
-            throw new ArgumentException("Teacher ID cannot be empty.", nameof(teacherId));
+            throw new DomainValidationException("Teacher ID cannot be empty.", nameof(teacherId));
 
         TeacherId = teacherId;
         Touch();

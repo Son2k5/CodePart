@@ -1,43 +1,40 @@
-using System.Security.Claims;
+using CodePath.Application.Auth.Abstractions;
 using CodePath.Application.Users.Queries;
 using CodePath.Shared.Kernel.Enums;
+using CodePath.Shared.Web.Authorization;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using StackExchange.Redis;
 
 namespace CodePath.Infrastructure.Auth.Authorization;
 
-public class ActiveUserRequirement : IAuthorizationRequirement
-{
-    public UserRole? RequiredRole { get; }
-    public ActiveUserRequirement(UserRole? requiredRole = null) => RequiredRole = requiredRole;
-}
-
-public class ActiveUserAuthorizationHandler : AuthorizationHandler<ActiveUserRequirement>
+/// <summary>
+/// Handler duy nhất cho <see cref="ActiveUserRequirement"/> (định nghĩa ở Shared.Web).
+/// Api chỉ phụ thuộc Shared.Web, không phụ thuộc Infrastructure type.
+/// </summary>
+public sealed class ActiveUserAuthorizationHandler : AuthorizationHandler<ActiveUserRequirement>
 {
     private readonly ISender _sender;
-    private readonly IDatabase _redis;
+    private readonly IUserStatusCache _statusCache;
 
-    public ActiveUserAuthorizationHandler(ISender sender, IConnectionMultiplexer redis)
+    public ActiveUserAuthorizationHandler(ISender sender, IUserStatusCache statusCache)
     {
         _sender = sender;
-        _redis = redis.GetDatabase();
+        _statusCache = statusCache;
     }
 
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, ActiveUserRequirement requirement)
     {
-        var sub = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+        var sub = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                ?? context.User.FindFirst("sub")?.Value;
 
         if (!Guid.TryParse(sub, out var userId)) return;
 
-        var cacheKey = $"user:status:{userId}";
-        var cachedStatus = await _redis.StringGetAsync(cacheKey);
+        var cachedStatus = await _statusCache.TryGetStatusAsync(userId);
 
         UserStatus currentStatus;
-        if (cachedStatus.HasValue && Enum.TryParse<UserStatus>(cachedStatus.ToString(), out var parsedStatus))
+        if (cachedStatus.HasValue)
         {
-            currentStatus = parsedStatus;
+            currentStatus = cachedStatus.Value;
         }
         else
         {
@@ -45,14 +42,14 @@ public class ActiveUserAuthorizationHandler : AuthorizationHandler<ActiveUserReq
             if (!userResult.IsSuccess || userResult.Value is null) return;
 
             currentStatus = userResult.Value.Status;
-            await _redis.StringSetAsync(cacheKey, currentStatus.ToString(), TimeSpan.FromMinutes(5));
+            await _statusCache.SetStatusAsync(userId, currentStatus);
         }
 
         if (currentStatus != UserStatus.Active) return;
 
         if (requirement.RequiredRole.HasValue)
         {
-            var roleClaim = context.User.FindFirst(ClaimTypes.Role)?.Value;
+            var roleClaim = context.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
             if (roleClaim != requirement.RequiredRole.Value.ToString()) return;
         }
 
