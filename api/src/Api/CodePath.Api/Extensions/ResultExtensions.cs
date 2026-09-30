@@ -6,7 +6,7 @@ namespace CodePath.Api.Extensions;
 
 public static class ResultExtensions
 {
-    public static IResult ToHttpResult<T>(this Result<T> result)
+    public static Microsoft.AspNetCore.Http.IResult ToHttpResult<T>(this Result<T> result)
     {
         if (result.IsSuccess)
         {
@@ -33,6 +33,7 @@ public static class ResultExtensions
 
         var (statusCode, title) = result.ErrorCode switch
         {
+            ErrorCodes.TooManyRequests => (StatusCodes.Status429TooManyRequests, "Too many requests"),
             ErrorCodes.NotFound => (StatusCodes.Status404NotFound, "Không tìm thấy dữ liệu"),
             ErrorCodes.Unauthorized => (StatusCodes.Status401Unauthorized, "Không được phép truy cập"),
             ErrorCodes.Forbidden or ErrorCodes.AccountPending or ErrorCodes.AccountRejected or ErrorCodes.AccountDisabled 

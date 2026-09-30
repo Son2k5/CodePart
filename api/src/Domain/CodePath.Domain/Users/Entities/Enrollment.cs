@@ -21,23 +21,25 @@ public sealed class Enrollment : BaseEntity
 
     private Enrollment() { }
 
-    public static Enrollment Create(Guid courseId, Guid studentId)
+    public static Enrollment Create(Guid courseId, Guid studentId, DateTime utcNow)
     {
         if (courseId == Guid.Empty)
             throw new DomainValidationException("Course ID cannot be empty.", nameof(courseId));
         if (studentId == Guid.Empty)
             throw new DomainValidationException("Student ID cannot be empty.", nameof(studentId));
 
+        EnsureUtc(utcNow);
         return new Enrollment
         {
             Id = Guid.NewGuid(),
             CourseId = courseId,
             StudentId = studentId,
-            Status = EnrollmentStatus.Active
+            Status = EnrollmentStatus.Active,
+            CreatedAt = utcNow
         };
     }
 
-    public void UpdateScores(decimal midtermScore, decimal finalScore, decimal midtermWeight = 0.4m)
+    public void UpdateScores(decimal midtermScore, decimal finalScore, DateTime utcNow, decimal midtermWeight = 0.4m)
     {
         if (midtermScore is < 0 or > 10)
             throw new DomainValidationException("Midterm score must be between 0 and 10.", nameof(midtermScore));
@@ -57,21 +59,21 @@ public sealed class Enrollment : BaseEntity
             Status = EnrollmentStatus.Completed;
         }
 
-        Touch();
+        Touch(utcNow);
     }
 
-    public void Drop()
+    public void Drop(DateTime utcNow)
     {
         if (Status == EnrollmentStatus.Completed)
             throw new DomainRuleViolationException("Cannot drop a completed course.");
 
         Status = EnrollmentStatus.Dropped;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void Complete()
+    public void Complete(DateTime utcNow)
     {
         Status = EnrollmentStatus.Completed;
-        Touch();
+        Touch(utcNow);
     }
 }

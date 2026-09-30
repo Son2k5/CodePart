@@ -8,6 +8,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NetArchTest.Rules" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Domain\CodePath.Domain\CodePath.Domain.csproj" />

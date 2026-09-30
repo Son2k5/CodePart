@@ -12,5 +12,7 @@ public static class ErrorCodes
     public const string AccountRejected = "ACCOUNT_REJECTED";
     public const string AccountDisabled = "ACCOUNT_DISABLED";
     public const string InfraError = "INFRASTRUCTURE_ERROR";
+    public const string TooManyRequests = "TOO_MANY_REQUESTS";
+    public const string RateLimitExceeded = "RATE_LIMIT_EXCEEDED";
     public const string InternalServerError = "INTERNAL_SERVER_ERROR";
 }

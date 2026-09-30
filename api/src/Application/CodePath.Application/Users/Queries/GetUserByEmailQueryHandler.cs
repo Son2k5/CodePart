@@ -16,7 +16,7 @@ internal sealed class GetUserByEmailQueryHandler : IRequestHandler<GetUserByEmai
 
     public async Task<Result<UserAuthDto>> Handle(GetUserByEmailQuery request, CancellationToken cancellationToken)
     {
-        var email = request.Email.Trim().ToLowerInvariant();
+        var email = EmailNormalizer.Normalize(request.Email);
         var user = await _dbContext.GetByEmailReadOnlyAsync(email, cancellationToken);
 
         if (user is null) return Result<UserAuthDto>.Failure("User not found.");

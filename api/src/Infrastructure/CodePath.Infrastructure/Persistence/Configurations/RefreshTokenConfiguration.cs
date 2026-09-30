@@ -19,11 +19,20 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.Property(r => r.UserId)
             .IsRequired();
 
+        builder.Property(r => r.FamilyId)
+            .IsRequired();
+
+        builder.Property(r => r.ParentTokenId);
+
         builder.Property(r => r.TokenHash)
             .IsRequired()
             .HasMaxLength(128);
 
         builder.Property(r => r.ExpiresAt)
+            .IsRequired()
+            .HasColumnType("timestamptz");
+
+        builder.Property(r => r.AbsoluteExpiresAt)
             .IsRequired()
             .HasColumnType("timestamptz");
 
@@ -61,11 +70,23 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.HasIndex(r => r.UserId)
             .HasDatabaseName("ix_refresh_tokens_user");
 
+        builder.HasIndex(r => r.FamilyId)
+            .HasDatabaseName("ix_refresh_tokens_family");
+
+        builder.HasIndex(r => new { r.UserId, r.FamilyId })
+            .HasFilter("\"RevokedAt\" IS NULL")
+            .HasDatabaseName("ix_refresh_tokens_active");
+
         // Relationship & Cascade Constraint with User
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(r => r.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<RefreshToken>()
+            .WithMany()
+            .HasForeignKey(r => r.ParentTokenId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // Ignore Domain Events
         builder.Ignore(r => r.DomainEvents);

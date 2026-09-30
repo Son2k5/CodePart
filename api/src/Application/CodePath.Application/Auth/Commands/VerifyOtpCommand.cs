@@ -1,5 +1,5 @@
 using CodePath.Application.Auth.Abstractions;
-using CodePath.Application.Users.Commands;
+using CodePath.Application.Users.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using FluentValidation;
 using MediatR;
@@ -13,31 +13,44 @@ public sealed class VerifyOtpCommandValidator : AbstractValidator<VerifyOtpComma
     public VerifyOtpCommandValidator()
     {
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.Otp).NotEmpty().Length(6).Matches(@"^\d{6}$").WithMessage("Mã OTP gồm 6 chữ số.");
+        RuleFor(x => x.Otp)
+            .NotEmpty()
+            .Length(6)
+            .Matches(@"^\d{6}$")
+            .WithMessage("OTP must contain exactly six digits.");
     }
 }
 
 internal sealed class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand, Result<string>>
 {
     private readonly IOtpService _otpService;
-    private readonly ISender _sender;
+    private readonly IUsersDbContext _usersDbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public VerifyOtpCommandHandler(IOtpService otpService, ISender sender)
+    public VerifyOtpCommandHandler(
+        IOtpService otpService,
+        IUsersDbContext usersDbContext,
+        TimeProvider timeProvider)
     {
         _otpService = otpService;
-        _sender = sender;
+        _usersDbContext = usersDbContext;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<string>> Handle(VerifyOtpCommand request, CancellationToken cancellationToken)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-
+        var normalizedEmail = EmailNormalizer.Normalize(request.Email);
         var (isValid, errorMessage) = await _otpService.VerifyOtpAsync(normalizedEmail, request.Otp);
-        if (!isValid) return Result<string>.Failure(errorMessage ?? "Mã OTP không hợp lệ.");
+        if (!isValid)
+            return Result<string>.Failure(errorMessage ?? "The OTP is invalid.", ErrorCodes.BadRequest);
 
-        var verifyResult = await _sender.Send(new VerifyUserEmailCommand(normalizedEmail), cancellationToken);
-        if (!verifyResult.IsSuccess) return Result<string>.Failure(verifyResult.Error ?? "Không thể xác minh email.");
+        var user = await _usersDbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (user is null)
+            return Result<string>.Failure("User not found.", ErrorCodes.NotFound);
 
-        return Result<string>.Success("Xác minh email thành công. Bây giờ bạn có thể đăng nhập.");
+        user.VerifyEmail(_timeProvider.GetUtcNow().UtcDateTime);
+        await _usersDbContext.SaveChangesAsync(cancellationToken);
+
+        return Result<string>.Success("Email verified successfully. You can now sign in.");
     }
 }

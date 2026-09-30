@@ -28,6 +28,7 @@ public sealed class Course : BaseEntity
         string semester,
         string joinCode,
         Guid teacherId,
+        DateTime utcNow,
         int maxCapacity = 60)
     {
         if (string.IsNullOrWhiteSpace(subjectName))
@@ -45,6 +46,7 @@ public sealed class Course : BaseEntity
         if (maxCapacity <= 0)
             throw new DomainValidationException("Max capacity must be greater than 0.", nameof(maxCapacity));
 
+        EnsureUtc(utcNow);
         return new Course
         {
             Id = Guid.NewGuid(),
@@ -55,31 +57,32 @@ public sealed class Course : BaseEntity
             JoinCode = joinCode.Trim().ToUpperInvariant(),
             TeacherId = teacherId,
             MaxCapacity = maxCapacity,
-            Status = CourseStatus.Draft
+            Status = CourseStatus.Draft,
+            CreatedAt = utcNow
         };
     }
 
-    public void Activate()
+    public void Activate(DateTime utcNow)
     {
         if (Status == CourseStatus.Active)
             throw new DomainRuleViolationException("Course is already active.");
 
         Status = CourseStatus.Active;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void Close()
+    public void Close(DateTime utcNow)
     {
         Status = CourseStatus.Closed;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void AssignTeacher(Guid teacherId)
+    public void AssignTeacher(Guid teacherId, DateTime utcNow)
     {
         if (teacherId == Guid.Empty)
             throw new DomainValidationException("Teacher ID cannot be empty.", nameof(teacherId));
 
         TeacherId = teacherId;
-        Touch();
+        Touch(utcNow);
     }
 }

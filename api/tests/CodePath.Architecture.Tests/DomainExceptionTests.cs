@@ -15,7 +15,8 @@ public class DomainExceptionTests
             fullName: "",
             email: "student@hanu.edu.vn",
             passwordHash: "hash123",
-            studentId: "2001040001");
+            studentId: "2001040001",
+            utcNow: DateTime.UtcNow);
 
         // Assert
         act.Should().Throw<DomainValidationException>()
@@ -29,10 +30,11 @@ public class DomainExceptionTests
         var teacher = User.CreateTeacher(
             fullName: "Teacher Name",
             email: "teacher@hanu.edu.vn",
-            passwordHash: "hash123");
+            passwordHash: "hash123",
+            utcNow: DateTime.UtcNow);
 
         // Act
-        var act = () => teacher.AssignToClass(Guid.NewGuid());
+        var act = () => teacher.AssignToClass(Guid.NewGuid(), DateTime.UtcNow);
 
         // Assert
         act.Should().Throw<DomainRuleViolationException>()
@@ -49,12 +51,13 @@ public class DomainExceptionTests
             language: "Vietnamese",
             semester: "Fall 2026",
             joinCode: "CODE12",
-            teacherId: Guid.NewGuid());
+            teacherId: Guid.NewGuid(),
+            utcNow: DateTime.UtcNow);
 
-        course.Activate();
+        course.Activate(DateTime.UtcNow);
 
         // Act
-        var act = () => course.Activate();
+        var act = () => course.Activate(DateTime.UtcNow);
 
         // Assert
         act.Should().Throw<DomainRuleViolationException>()

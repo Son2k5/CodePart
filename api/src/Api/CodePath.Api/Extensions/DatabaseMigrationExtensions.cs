@@ -25,9 +25,11 @@ public static class DatabaseMigrationExtensions
 
             var config = services.GetRequiredService<IConfiguration>();
             var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+            var timeProvider = services.GetRequiredService<TimeProvider>();
             var seedOptions = AdminSeedOptions.FromConfiguration(config);
 
-            await AdminSeeder.SeedAdminsAsync(dbContext, passwordHasher, seedOptions, logger);
+            await AdminSeeder.SeedAdminsAsync(dbContext, passwordHasher, seedOptions, logger, timeProvider);
+            await ExerciseSeeder.SeedDemoExerciseAsync(dbContext, timeProvider, logger);
         }
         catch (Exception ex)
         {

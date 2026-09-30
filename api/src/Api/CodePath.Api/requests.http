@@ -22,3 +22,49 @@ Accept: application/json
 
 GET {{host}}/api/auth/health
 Accept: application/json
+
+### Refresh session (refresh token is read only from the HttpOnly cookie)
+
+POST {{host}}/api/auth/refresh
+Accept: application/json
+
+### Logout is anonymous and idempotent (cookie-only refresh token)
+
+POST {{host}}/api/auth/logout
+Accept: application/json
+
+### Logout every session (requires a current access token)
+
+POST {{host}}/api/auth/logout-all
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### List pending teachers (AdminOnly)
+
+GET {{host}}/api/admin/teachers?status=Pending&limit=20
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### Approve a pending teacher (AdminOnly)
+
+POST {{host}}/api/admin/users/{{userId}}/approve
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### Reject a pending teacher (AdminOnly)
+
+POST {{host}}/api/admin/users/{{userId}}/reject
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### Disable an active user (AdminOnly)
+
+POST {{host}}/api/admin/users/{{userId}}/disable
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### Trace status changes for a user (AdminOnly)
+
+GET {{host}}/api/admin/audit-logs?targetUserId={{userId}}&limit=20
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json

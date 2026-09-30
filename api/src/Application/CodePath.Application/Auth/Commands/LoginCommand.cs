@@ -1,65 +1,82 @@
 using CodePath.Application.Auth.Abstractions;
-using CodePath.Application.Users.Commands;
-using CodePath.Application.Users.Queries;
+using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auth.Entities;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using FluentValidation;
 using MediatR;
+using System.Text.Json.Serialization;
 
 namespace CodePath.Application.Auth.Commands;
 
-public sealed record LoginResponse(string AccessToken, string RefreshToken, int ExpiresIn, string TokenType = "Bearer");
+public sealed record LoginResponse(string AccessToken, int ExpiresIn, string TokenType = "Bearer")
+{
+    [JsonIgnore]
+    public string RefreshToken { get; init; } = string.Empty;
 
-public sealed record LoginCommand(string Email, string Password) : IRequest<Result<LoginResponse>>;
+    [JsonIgnore]
+    public DateTime RefreshTokenExpiresAt { get; init; }
+}
+
+public sealed record LoginCommand(string Email, string Password, string? IpAddress = null) : IRequest<Result<LoginResponse>>;
 
 public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
 {
     public LoginCommandValidator()
     {
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.Password).NotEmpty();
+        RuleFor(x => x.Password).NotEmpty().MaximumLength(128);
     }
 }
 
 internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginResponse>>
 {
-    private readonly ISender _sender;
+    private readonly IUsersDbContext _usersDbContext;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IAuthDbContext _authDbContext;
+    private readonly ILoginAttemptService _loginAttemptService;
+    private readonly TimeProvider _timeProvider;
 
     private const string GenericAuthErrorMessage = "Email hoặc mật khẩu không chính xác.";
 
     public LoginCommandHandler(
-        ISender sender,
+        IUsersDbContext usersDbContext,
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
-        IAuthDbContext authDbContext)
+        IAuthDbContext authDbContext,
+        ILoginAttemptService loginAttemptService,
+        TimeProvider timeProvider)
     {
-        _sender = sender;
+        _usersDbContext = usersDbContext;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
         _authDbContext = authDbContext;
+        _loginAttemptService = loginAttemptService;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<LoginResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedEmail = EmailNormalizer.Normalize(request.Email);
 
-        var userResult = await _sender.Send(new GetUserCredentialsByEmailQuery(normalizedEmail), cancellationToken);
-        if (!userResult.IsSuccess || userResult.Value is null)
+        var lockoutRemaining = await _loginAttemptService.GetLockoutRemainingAsync(normalizedEmail);
+        if (lockoutRemaining.HasValue && lockoutRemaining.Value > TimeSpan.Zero)
         {
-            _passwordHasher.SimulateVerification();
-            return Result<LoginResponse>.Failure(GenericAuthErrorMessage, "UNAUTHORIZED");
+            return CreateLockoutResult(lockoutRemaining.Value);
         }
 
-        var user = userResult.Value;
+        var user = await _usersDbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
+        if (user is null)
+        {
+            _passwordHasher.SimulateVerification();
+            return await RecordFailureAsync(normalizedEmail);
+        }
 
         var isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
         if (!isPasswordValid)
         {
-            return Result<LoginResponse>.Failure(GenericAuthErrorMessage, "UNAUTHORIZED");
+            return await RecordFailureAsync(normalizedEmail);
         }
 
         if (!user.EmailVerifiedAt.HasValue)
@@ -81,21 +98,41 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
                 throw new ArgumentOutOfRangeException();
         }
 
-        await _sender.Send(new RecordLoginSuccessCommand(user.Id), cancellationToken);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        user.RecordLoginSuccess(utcNow);
 
         var tokens = _jwtTokenService.GenerateTokens(user.Id, user.Email, user.Role, user.Status);
         var tokenHash = _jwtTokenService.HashRefreshToken(tokens.RefreshToken);
 
         var refreshTokenEntity = RefreshToken.CreateWithDefaultLifetime(
             user.Id,
-            tokenHash);
+            tokenHash,
+            utcNow,
+            request.IpAddress);
 
         await _authDbContext.AddRefreshTokenAsync(refreshTokenEntity, cancellationToken);
         await _authDbContext.SaveChangesAsync(cancellationToken);
+        await _loginAttemptService.ResetAsync(normalizedEmail);
 
         return Result<LoginResponse>.Success(new LoginResponse(
             tokens.AccessToken,
-            tokens.RefreshToken,
-            tokens.ExpiresInSeconds));
+            tokens.ExpiresInSeconds)
+        {
+            RefreshToken = tokens.RefreshToken,
+            RefreshTokenExpiresAt = refreshTokenEntity.ExpiresAt
+        });
     }
+
+    private async Task<Result<LoginResponse>> RecordFailureAsync(string normalizedEmail)
+    {
+        var failure = await _loginAttemptService.RecordFailureAsync(normalizedEmail);
+        return failure.IsLocked
+            ? CreateLockoutResult(failure.RetryAfter ?? TimeSpan.FromMinutes(15))
+            : Result<LoginResponse>.Failure(GenericAuthErrorMessage, ErrorCodes.Unauthorized);
+    }
+
+    private static Result<LoginResponse> CreateLockoutResult(TimeSpan remaining)
+        => Result<LoginResponse>.Failure(
+            $"Too many failed login attempts. Try again in {Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes))} minute(s).",
+            ErrorCodes.TooManyRequests);
 }

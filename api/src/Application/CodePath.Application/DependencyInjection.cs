@@ -1,3 +1,4 @@
+using CodePath.Application.Admin.Commands;
 using CodePath.Shared.Kernel.Behaviors;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +9,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
         services.AddMediatR(config =>
         {
             config.RegisterServicesFromAssembly(typeof(DependencyInjection).Assembly);
@@ -16,6 +18,7 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
+        services.AddScoped<AdminStatusChangeService>();
 
         return services;
     }

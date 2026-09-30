@@ -1,4 +1,5 @@
 using CodePath.Domain.Common.Exceptions;
+using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Entities;
 using CodePath.Shared.Kernel.Enums;
 
@@ -31,7 +32,8 @@ public sealed class User : BaseEntity
         string fullName,
         string email,
         string passwordHash,
-        string studentId)
+        string studentId,
+        DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(fullName))
             throw new DomainValidationException("Họ và tên không được để trống.", nameof(fullName));
@@ -50,23 +52,25 @@ public sealed class User : BaseEntity
         if (trimmedStudentId.Length > 50)
             throw new DomainValidationException("StudentId không được vượt quá 50 ký tự.", nameof(studentId));
 
+        EnsureUtc(utcNow);
         return new User
         {
             Id = Guid.NewGuid(),
             FullName = trimmedFullName,
-            Email = email.Trim().ToLowerInvariant(),
+            Email = EmailNormalizer.Normalize(email),
             PasswordHash = passwordHash,
             Role = UserRole.Student,
             Status = UserStatus.Active,
             StudentId = trimmedStudentId,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = utcNow
         };
     }
 
     public static User CreateTeacher(
         string fullName,
         string email,
-        string passwordHash)
+        string passwordHash,
+        DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(fullName))
             throw new DomainValidationException("Họ và tên không được để trống.", nameof(fullName));
@@ -79,23 +83,25 @@ public sealed class User : BaseEntity
         if (trimmedFullName.Length > 200)
             throw new DomainValidationException("FullName không được vượt quá 200 ký tự.", nameof(fullName));
 
+        EnsureUtc(utcNow);
         return new User
         {
             Id = Guid.NewGuid(),
             FullName = trimmedFullName,
-            Email = email.Trim().ToLowerInvariant(),
+            Email = EmailNormalizer.Normalize(email),
             PasswordHash = passwordHash,
             Role = UserRole.Teacher,
             Status = UserStatus.Pending,
             StudentId = null,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = utcNow
         };
     }
 
     public static User CreateAdmin(
         string fullName,
         string email,
-        string passwordHash)
+        string passwordHash,
+        DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(fullName))
             throw new DomainValidationException("Họ và tên không được để trống.", nameof(fullName));
@@ -108,42 +114,74 @@ public sealed class User : BaseEntity
         if (trimmedFullName.Length > 200)
             throw new DomainValidationException("FullName không được vượt quá 200 ký tự.", nameof(fullName));
 
+        EnsureUtc(utcNow);
         return new User
         {
             Id = Guid.NewGuid(),
             FullName = trimmedFullName,
-            Email = email.Trim().ToLowerInvariant(),
+            Email = EmailNormalizer.Normalize(email),
             PasswordHash = passwordHash,
             Role = UserRole.Admin,
             Status = UserStatus.Active,
             StudentId = null,
-            EmailVerifiedAt = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow
+            EmailVerifiedAt = utcNow,
+            CreatedAt = utcNow
         };
     }
 
-    public void VerifyEmail()
+    public void VerifyEmail(DateTime utcNow)
     {
-        EmailVerifiedAt = DateTime.UtcNow;
-        Touch();
+        EnsureUtc(utcNow);
+        EmailVerifiedAt = utcNow;
+        Touch(utcNow);
     }
 
-    public void RecordLoginSuccess()
+    public void RecordLoginSuccess(DateTime utcNow)
     {
-        LastLoginAt = DateTime.UtcNow;
-        Touch();
+        EnsureUtc(utcNow);
+        LastLoginAt = utcNow;
+        Touch(utcNow);
     }
 
-    public void UpdateStatus(UserStatus newStatus)
+    public void ApproveTeacher(DateTime utcNow)
     {
-        Status = newStatus;
-        Touch();
+        EnsureTeacherPending("approved");
+        Status = UserStatus.Active;
+        Touch(utcNow);
     }
 
-    public void UpdateUnverifiedAccount(string fullName, string passwordHash, UserRole role, string? studentId)
+    public void RejectTeacher(DateTime utcNow)
+    {
+        EnsureTeacherPending("rejected");
+        Status = UserStatus.Rejected;
+        Touch(utcNow);
+    }
+
+    public void Disable(Guid actorId, DateTime utcNow)
+    {
+        if (actorId == Id)
+            throw new DomainRuleViolationException(
+                "Administrators cannot disable their own account.",
+                ErrorCodes.Forbidden);
+
+        if (Status != UserStatus.Active)
+            throw new DomainRuleViolationException(
+                $"User status cannot transition from {Status} to {UserStatus.Disabled}.",
+                ErrorCodes.Conflict);
+
+        Status = UserStatus.Disabled;
+        Touch(utcNow);
+    }
+
+    public void UpdateUnverifiedAccount(string fullName, string passwordHash, UserRole expectedRole, string? studentId, DateTime utcNow)
     {
         if (EmailVerifiedAt.HasValue)
             throw new DomainRuleViolationException("Không thể ghi đè tài khoản đã xác thực.");
+
+        if (Role != expectedRole)
+            throw new DomainRuleViolationException(
+                "The role of an existing account cannot be changed through registration.",
+                ErrorCodes.Conflict);
 
         var trimmedFullName = fullName.Trim();
         var trimmedStudentId = studentId?.Trim();
@@ -155,12 +193,11 @@ public sealed class User : BaseEntity
 
         FullName = trimmedFullName;
         PasswordHash = passwordHash;
-        Role = role;
         StudentId = trimmedStudentId;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void AssignToClass(Guid classId)
+    public void AssignToClass(Guid classId, DateTime utcNow)
     {
         if (Role != UserRole.Student)
             throw new DomainRuleViolationException("Only students can be assigned to a class.");
@@ -168,10 +205,10 @@ public sealed class User : BaseEntity
             throw new DomainValidationException("Class ID cannot be empty.", nameof(classId));
 
         ClassId = classId;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void AssignToFaculty(Guid facultyId)
+    public void AssignToFaculty(Guid facultyId, DateTime utcNow)
     {
         if (Role != UserRole.Teacher)
             throw new DomainRuleViolationException("Only teachers can be assigned directly to a faculty.");
@@ -179,23 +216,36 @@ public sealed class User : BaseEntity
             throw new DomainValidationException("Faculty ID cannot be empty.", nameof(facultyId));
 
         FacultyId = facultyId;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void UpdateProfile(string fullName)
+    public void UpdateProfile(string fullName, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(fullName))
             throw new DomainValidationException("Họ và tên không được để trống.", nameof(fullName));
         FullName = fullName.Trim();
-        Touch();
+        Touch(utcNow);
     }
 
-    public void ChangePassword(string newPasswordHash)
+    public void ChangePassword(string newPasswordHash, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(newPasswordHash))
             throw new DomainValidationException("Mật khẩu băm không được để trống.", nameof(newPasswordHash));
         PasswordHash = newPasswordHash;
-        Touch();
+        Touch(utcNow);
+    }
+
+    private void EnsureTeacherPending(string action)
+    {
+        if (Role != UserRole.Teacher)
+            throw new DomainRuleViolationException(
+                $"Only teacher accounts can be {action}.",
+                ErrorCodes.Conflict);
+
+        if (Status != UserStatus.Pending)
+            throw new DomainRuleViolationException(
+                $"User status cannot transition from {Status} for action '{action}'. Rejected accounts cannot return to Pending.",
+                ErrorCodes.Conflict);
     }
 }
 

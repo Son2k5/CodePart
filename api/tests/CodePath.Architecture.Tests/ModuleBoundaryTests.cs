@@ -1,19 +1,68 @@
+using CodePath.Domain.Users.Entities;
+using CodePath.Shared.Kernel.Common;
 using FluentAssertions;
+using NetArchTest.Rules;
 using Xunit;
 
 namespace CodePath.Architecture.Tests;
 
-/// <summary>
-/// Quy uoc kien truc toi thieu. Se bo sung NetArchTest khi can siet module boundary.
-/// - Cam Services/*Service.cs trong *.Application (chi dung Handler-cross).
-/// - Giao tiep lien module qua ISender.Send(public Query/Command).
-/// </summary>
 public class ModuleBoundaryTests
 {
     [Fact]
-    public void ArchitectureRAEADME_ShouldExist()
+    public void Domain_ShouldNotDependOnOuterLayers()
     {
-        File.Exists(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "docs", "ARCHITECTURE.md"))
-            .Should().BeTrue();
+        var result = Types.InAssembly(typeof(User).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "CodePath.Application",
+                "CodePath.Infrastructure",
+                "CodePath.Api",
+                "CodePath.Shared.Web")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Application_ShouldNotDependOnInfrastructureOrApi()
+    {
+        var result = Types.InAssembly(typeof(CodePath.Application.DependencyInjection).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "CodePath.Infrastructure",
+                "CodePath.Api",
+                "CodePath.Shared.Web")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SharedKernel_ShouldNotDependOnApplicationLayers()
+    {
+        var result = Types.InAssembly(typeof(Result<>).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "CodePath.Domain",
+                "CodePath.Application",
+                "CodePath.Infrastructure",
+                "CodePath.Api",
+                "CodePath.Shared.Web")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ApplicationHandlers_ShouldBeSealed()
+    {
+        var result = Types.InAssembly(typeof(CodePath.Application.DependencyInjection).Assembly)
+            .That()
+            .HaveNameEndingWith("Handler")
+            .Should()
+            .BeSealed()
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue();
     }
 }

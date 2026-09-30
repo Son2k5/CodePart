@@ -18,7 +18,7 @@ public sealed class Class : BaseEntity
 
     private Class() { }
 
-    public static Class Create(string name, string academicYear, Guid facultyId, Guid teacherId)
+    public static Class Create(string name, string academicYear, Guid facultyId, Guid teacherId, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainValidationException("Tên lớp không được để trống.", nameof(name));
@@ -29,26 +29,28 @@ public sealed class Class : BaseEntity
         if (teacherId == Guid.Empty)
             throw new DomainValidationException("Teacher ID cannot be empty.", nameof(teacherId));
 
+        EnsureUtc(utcNow);
         return new Class
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
             AcademicYear = academicYear.Trim(),
             FacultyId = facultyId,
-            TeacherId = teacherId
+            TeacherId = teacherId,
+            CreatedAt = utcNow
         };
     }
 
-    public void AssignTeacher(Guid teacherId)
+    public void AssignTeacher(Guid teacherId, DateTime utcNow)
     {
         if (teacherId == Guid.Empty)
             throw new DomainValidationException("Teacher ID cannot be empty.", nameof(teacherId));
 
         TeacherId = teacherId;
-        Touch();
+        Touch(utcNow);
     }
 
-    public void UpdateDetails(string name, string academicYear)
+    public void UpdateDetails(string name, string academicYear, DateTime utcNow)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainValidationException("Tên lớp không được để trống.", nameof(name));
@@ -57,6 +59,6 @@ public sealed class Class : BaseEntity
 
         Name = name.Trim();
         AcademicYear = academicYear.Trim();
-        Touch();
+        Touch(utcNow);
     }
 }

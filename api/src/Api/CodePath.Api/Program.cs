@@ -1,24 +1,28 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using CodePath.Api.Authorization;
 using CodePath.Api.Endpoints;
 using CodePath.Api.Extensions;
 using CodePath.Application;
 using CodePath.Application.Auth.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
-using CodePath.Shared.Web.Authorization;
 using CodePath.Shared.Web.Extensions;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
-Env.TraversePath().Load();
-
 var builder = WebApplication.CreateBuilder(args);
-builder.Configuration.AddEnvironmentVariables();
+
+if (builder.Environment.IsDevelopment())
+{
+    Env.TraversePath().Load();
+    builder.Configuration.AddEnvironmentVariables();
+}
 
 builder.Services.AddSharedInfrastructure(builder.Configuration);
 
@@ -136,6 +140,11 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", policy =>
         policy.Requirements.Add(new ActiveUserRequirement(UserRole.Admin)));
 });
+builder.Services.AddScoped<IAuthorizationHandler, ActiveUserAuthorizationHandler>();
+
+var authPermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 30);
+var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 30);
+var codeExecutionPermitLimit = builder.Configuration.GetValue("RateLimiting:CodeExecutionPermitLimit", 20);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -165,7 +174,7 @@ builder.Services.AddRateLimiter(options =>
 
         return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 20,
+            PermitLimit = authPermitLimit,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         });
@@ -177,15 +186,41 @@ builder.Services.AddRateLimiter(options =>
 
         return RateLimitPartition.GetFixedWindowLimiter($"login:{clientIp}", _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
+            PermitLimit = loginPermitLimit,
             Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy("health-rate-limit", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter($"health:{clientIp}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy("code-execution-rate-limit", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter($"code:{userId}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = codeExecutionPermitLimit,
+            Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         });
     });
 });
 
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -197,20 +232,42 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 };
-forwardedHeadersOptions.KnownNetworks.Clear();
-forwardedHeadersOptions.KnownProxies.Clear();
 
 var proxyNetworks = builder.Configuration.GetSection("ReverseProxy:KnownNetworks").Get<string[]>()
     ?? (builder.Configuration["ReverseProxy:KnownNetwork"] is not null
         ? new[] { builder.Configuration["ReverseProxy:KnownNetwork"]! }
         : Array.Empty<string>());
 
-foreach (var net in proxyNetworks)
+if (proxyNetworks.Length > 0)
 {
-    var subnetParts = net.Split('/');
-    if (subnetParts.Length == 2 && System.Net.IPAddress.TryParse(subnetParts[0], out var ip) && int.TryParse(subnetParts[1], out var prefix))
+    var trustedNetworks = new List<Microsoft.AspNetCore.HttpOverrides.IPNetwork>();
+
+    foreach (var network in proxyNetworks)
     {
-        forwardedHeadersOptions.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
+        var subnetParts = network.Split('/');
+        if (subnetParts.Length != 2
+            || !System.Net.IPAddress.TryParse(subnetParts[0], out var ip)
+            || !int.TryParse(subnetParts[1], out var prefix))
+        {
+            throw new InvalidOperationException($"Reverse proxy network '{network}' is not a valid CIDR value.");
+        }
+
+        try
+        {
+            trustedNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            throw new InvalidOperationException($"Reverse proxy network '{network}' has an invalid prefix length.", ex);
+        }
+    }
+
+    forwardedHeadersOptions.KnownNetworks.Clear();
+    forwardedHeadersOptions.KnownProxies.Clear();
+
+    foreach (var trustedNetwork in trustedNetworks)
+    {
+        forwardedHeadersOptions.KnownNetworks.Add(trustedNetwork);
     }
 }
 
@@ -226,12 +283,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "CodePath API v1"));
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 
-app.UseRateLimiter();
-
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok(new { service = "CodePath API", status = "healthy" }))
@@ -264,9 +324,12 @@ app.MapGet("/health/redis", async (IRedisHealthProbe probe, IWebHostEnvironment 
             statusCode: StatusCodes.Status500InternalServerError);
 })
 .WithName("CheckRedisHealth")
-.WithTags("Health");
+.WithTags("Health")
+.RequireRateLimiting("health-rate-limit");
 
 app.MapAuthEndpoints();
+app.MapAdminEndpoints();
+app.MapExerciseEndpoints();
 
 app.Run();
 

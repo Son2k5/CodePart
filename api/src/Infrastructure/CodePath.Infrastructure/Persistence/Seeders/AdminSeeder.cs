@@ -13,6 +13,7 @@ public static class AdminSeeder
         IPasswordHasher passwordHasher,
         AdminSeedOptions seedOptions,
         ILogger logger,
+        TimeProvider timeProvider,
         CancellationToken ct = default)
     {
         if (!seedOptions.IsConfigured)
@@ -43,7 +44,11 @@ public static class AdminSeeder
             if (!exists)
             {
                 var hash = passwordHasher.HashPassword(admin.Password);
-                var adminUser = User.CreateAdmin(admin.FullName, admin.Email, hash);
+                var adminUser = User.CreateAdmin(
+                    admin.FullName,
+                    admin.Email,
+                    hash,
+                    timeProvider.GetUtcNow().UtcDateTime);
                 await dbContext.Users.AddAsync(adminUser, ct);
                 logger.LogInformation("Seeded admin account: {Email}", admin.Email);
             }

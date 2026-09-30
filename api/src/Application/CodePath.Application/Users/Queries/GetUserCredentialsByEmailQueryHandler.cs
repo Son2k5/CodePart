@@ -13,7 +13,7 @@ internal sealed class GetUserCredentialsByEmailQueryHandler : IRequestHandler<Ge
 
     public async Task<Result<UserCredentialsDto>> Handle(GetUserCredentialsByEmailQuery request, CancellationToken cancellationToken)
     {
-        var email = request.Email.Trim().ToLowerInvariant();
+        var email = EmailNormalizer.Normalize(request.Email);
         var user = await _dbContext.GetByEmailReadOnlyAsync(email, cancellationToken);
 
         if (user is null) return Result<UserCredentialsDto>.Failure("User not found.");

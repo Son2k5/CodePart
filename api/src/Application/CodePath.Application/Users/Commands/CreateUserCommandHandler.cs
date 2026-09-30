@@ -10,15 +10,18 @@ namespace CodePath.Application.Users.Commands;
 internal sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, Result<Guid>>
 {
     private readonly IUsersDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public CreateUserCommandHandler(IUsersDbContext dbContext)
+    public CreateUserCommandHandler(IUsersDbContext dbContext, TimeProvider timeProvider)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider;
     }
 
     public async Task<Result<Guid>> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedEmail = EmailNormalizer.Normalize(request.Email);
+        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
 
         var existingUser = await _dbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (existingUser != null)
@@ -28,16 +31,18 @@ internal sealed class CreateUserCommandHandler : IRequestHandler<CreateUserComma
                 return Result<Guid>.Failure("Email đã tồn tại trong hệ thống.", ErrorCodes.Conflict);
             }
 
-            existingUser.UpdateUnverifiedAccount(request.FullName, request.PasswordHash, request.Role, request.StudentId);
+            existingUser.UpdateUnverifiedAccount(request.FullName, request.PasswordHash, request.Role, request.StudentId, utcNow);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return Result<Guid>.Success(existingUser.Id);
         }
 
         User user = request.Role switch
         {
-            UserRole.Student => User.CreateStudent(request.FullName, normalizedEmail, request.PasswordHash, request.StudentId!),
-            UserRole.Teacher => User.CreateTeacher(request.FullName, normalizedEmail, request.PasswordHash),
-            UserRole.Admin => User.CreateAdmin(request.FullName, normalizedEmail, request.PasswordHash),
+            UserRole.Student => User.CreateStudent(request.FullName, normalizedEmail, request.PasswordHash, request.StudentId!, utcNow),
+            UserRole.Teacher => User.CreateTeacher(request.FullName, normalizedEmail, request.PasswordHash, utcNow),
+            UserRole.Admin => throw new ArgumentOutOfRangeException(
+                nameof(request.Role),
+                "Admin accounts cannot be created through the general user creation command."),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Role))
         };
 

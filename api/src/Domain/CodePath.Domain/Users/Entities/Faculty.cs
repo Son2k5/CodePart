@@ -12,27 +12,29 @@ public sealed class Faculty : BaseEntity
 
     private Faculty() { }
 
-    public static Faculty Create(string name, string code)
+    public static Faculty Create(string name, string code, DateTime utcNow)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
+        EnsureUtc(utcNow);
         return new Faculty
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
-            Code = code.Trim().ToUpperInvariant()
+            Code = code.Trim().ToUpperInvariant(),
+            CreatedAt = utcNow
         };
     }
 
-    public void Update(string name, string code)
+    public void Update(string name, string code, DateTime utcNow)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
         Name = name.Trim();
         Code = code.Trim().ToUpperInvariant();
-        Touch();
+        Touch(utcNow);
     }
 }
 

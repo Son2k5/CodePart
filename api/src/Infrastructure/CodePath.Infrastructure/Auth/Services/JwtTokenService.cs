@@ -13,8 +13,13 @@ namespace CodePath.Infrastructure.Auth.Services;
 public sealed class JwtTokenService : IJwtTokenService
 {
     private readonly JwtOptions _options;
+    private readonly TimeProvider _timeProvider;
 
-    public JwtTokenService(IOptions<JwtOptions> options) => _options = options.Value;
+    public JwtTokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
+    {
+        _options = options.Value;
+        _timeProvider = timeProvider;
+    }
 
     public GeneratedTokens GenerateTokens(Guid userId, string email, UserRole role, UserStatus status)
     {
@@ -38,7 +43,7 @@ public sealed class JwtTokenService : IJwtTokenService
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddMinutes(expiryMinutes),
+            Expires = _timeProvider.GetUtcNow().UtcDateTime.AddMinutes(expiryMinutes),
             Issuer = issuer,
             Audience = audience,
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)

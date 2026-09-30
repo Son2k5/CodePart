@@ -1,8 +1,9 @@
 using CodePath.Application.Auth.Abstractions;
-using CodePath.Application.Users.Queries;
+using CodePath.Application.Users.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace CodePath.Application.Auth.Commands;
 
@@ -15,38 +16,53 @@ public sealed class ResendOtpCommandValidator : AbstractValidator<ResendOtpComma
 
 internal sealed class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand, Result<string>>
 {
+    private const string NeutralResponse =
+        "If the account is eligible, a verification code will be sent to the supplied email address.";
+
     private readonly IOtpService _otpService;
     private readonly IEmailSender _emailSender;
-    private readonly ISender _sender;
+    private readonly IUsersDbContext _usersDbContext;
+    private readonly ILogger<ResendOtpCommandHandler> _logger;
 
-    public ResendOtpCommandHandler(IOtpService otpService, IEmailSender emailSender, ISender sender)
+    public ResendOtpCommandHandler(
+        IOtpService otpService,
+        IEmailSender emailSender,
+        IUsersDbContext usersDbContext,
+        ILogger<ResendOtpCommandHandler> logger)
     {
         _otpService = otpService;
         _emailSender = emailSender;
-        _sender = sender;
+        _usersDbContext = usersDbContext;
+        _logger = logger;
     }
 
     public async Task<Result<string>> Handle(ResendOtpCommand request, CancellationToken cancellationToken)
     {
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-
-        var userResult = await _sender.Send(new GetUserByEmailQuery(normalizedEmail), cancellationToken);
-        if (!userResult.IsSuccess || userResult.Value is null)
+        var normalizedEmail = EmailNormalizer.Normalize(request.Email);
+        var user = await _usersDbContext.GetByEmailReadOnlyAsync(normalizedEmail, cancellationToken);
+        if (user is null || user.EmailVerifiedAt.HasValue)
         {
-            return Result<string>.Success("Nếu tài khoản tồn tại, mã OTP mới đã được gửi.");
+            return Result<string>.Success(NeutralResponse);
         }
 
-        if (userResult.Value.EmailVerifiedAt.HasValue)
+        var issue = await _otpService.TryIssueOtpAsync(normalizedEmail);
+        if (!issue.Issued || string.IsNullOrWhiteSpace(issue.Otp))
         {
-            return Result<string>.Failure("Email này đã được xác thực trước đó.");
+            return Result<string>.Success(NeutralResponse);
         }
 
-        var (canRequest, error) = await _otpService.CanRequestOtpAsync(normalizedEmail);
-        if (!canRequest) return Result<string>.Failure(error!);
-
-        var otp = await _otpService.GenerateAndStoreOtpAsync(normalizedEmail);
-        await _emailSender.SendOtpEmailAsync(normalizedEmail, otp, cancellationToken);
-
-        return Result<string>.Success("Mã OTP mới đã được gửi đến email của bạn.");
+        try
+        {
+            await _emailSender.SendOtpEmailAsync(normalizedEmail, issue.Otp, cancellationToken);
+            return Result<string>.Success(NeutralResponse);
+        }
+        catch (Exception exception)
+        {
+            await _otpService.InvalidateOtpAsync(normalizedEmail, issue.Otp);
+            _logger.LogError(exception, "OTP resend email delivery failed for {Recipient}.", normalizedEmail);
+            return Result<string>.Failure(
+                "The verification email service is temporarily unavailable. Please try again later.",
+                ErrorCodes.InfraError);
+        }
     }
 }
