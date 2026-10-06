@@ -7,6 +7,7 @@ using CodePath.Domain.Users.Entities;
 using CodePath.Infrastructure.Persistence;
 using CodePath.Integration.Tests.Infrastructure;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -18,6 +19,23 @@ public sealed class AdminWorkflowSpecifications
     private readonly CodePathApiFixture _fixture;
 
     public AdminWorkflowSpecifications(CodePathApiFixture fixture) => _fixture = fixture;
+
+    [Fact]
+    public async Task Startup_ShouldSeedBothConfiguredAdminAccounts()
+    {
+        using var scope = _fixture.Factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var seededAdmins = await dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.Email == "admin01@hanu.edu.vn" || user.Email == "admin02@hanu.edu.vn")
+            .Select(user => new { user.Email, user.PasswordHash })
+            .ToListAsync();
+
+        seededAdmins.Select(user => user.Email)
+            .Should().BeEquivalentTo("admin01@hanu.edu.vn", "admin02@hanu.edu.vn");
+        seededAdmins.Should().OnlyContain(user => user.PasswordHash.StartsWith("$2"));
+    }
 
     [Fact]
     public async Task AdminWorkflow_ShouldApproveDisableAuditAndInvalidateExistingSessions()
@@ -57,7 +75,7 @@ public sealed class AdminWorkflowSpecifications
             .Split(';', 2)[0]
             .Split('=', 2)[1];
 
-        // Prime the status cache so this test proves that disable invalidates it.
+        // Confirm the token is valid before the account is disabled.
         using var activeMeRequest = AuthorizedRequest(HttpMethod.Get, "/api/auth/me", teacherAccessToken);
         using var activeMeResponse = await _fixture.Client.SendAsync(activeMeRequest);
         activeMeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -73,7 +91,7 @@ public sealed class AdminWorkflowSpecifications
 
         using var staleAccessRequest = AuthorizedRequest(HttpMethod.Get, "/api/auth/me", teacherAccessToken);
         using var staleAccessResponse = await _fixture.Client.SendAsync(staleAccessRequest);
-        staleAccessResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        staleAccessResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         using var refreshRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/refresh");
         refreshRequest.Headers.Add("Cookie", $"refreshToken={refreshToken}");

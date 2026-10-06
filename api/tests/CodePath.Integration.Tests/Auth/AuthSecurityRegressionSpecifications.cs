@@ -85,6 +85,8 @@ public sealed class AuthSecurityRegressionSpecifications
 
         var json = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
         json.TryGetProperty("refreshToken", out _).Should().BeFalse();
+        json.GetProperty("user").GetProperty("email").GetString().Should().Be(email);
+        json.GetProperty("user").GetProperty("role").GetString().Should().Be("Student");
     }
 
     [Fact]
@@ -288,14 +290,15 @@ public sealed class AuthSecurityRegressionSpecifications
     }
 
     [Fact]
-    public async Task LoginFailuresAcrossDifferentIps_ShouldLockOnlyTheTargetAccount()
+    public async Task LoginFailuresForSameIpAndEmail_ShouldNotAffectAnotherEmailBehindNat()
     {
         const string targetEmail = "2026000016@hanu.edu.vn";
         const string otherEmail = "2026000017@hanu.edu.vn";
         await AuthTestClient.RegisterVerifyAndLoginAsync(_fixture, targetEmail);
         await AuthTestClient.RegisterVerifyAndLoginAsync(_fixture, otherEmail);
 
-        for (var attempt = 1; attempt <= 10; attempt++)
+        const string sharedIp = "203.0.113.20";
+        for (var attempt = 1; attempt <= 5; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
             {
@@ -305,7 +308,7 @@ public sealed class AuthSecurityRegressionSpecifications
                     password = "WrongPassword1!"
                 })
             };
-            request.Headers.Add("X-Forwarded-For", $"203.0.113.{attempt}");
+            request.Headers.Add("X-Forwarded-For", sharedIp);
             using var response = await _fixture.Client.SendAsync(request);
             response.StatusCode.Should().BeOneOf(
                 HttpStatusCode.Unauthorized,
@@ -320,7 +323,7 @@ public sealed class AuthSecurityRegressionSpecifications
                 password = AuthTestClient.ValidPassword
             })
         };
-        lockedRequest.Headers.Add("X-Forwarded-For", "203.0.113.200");
+        lockedRequest.Headers.Add("X-Forwarded-For", sharedIp);
         using var lockedResponse = await _fixture.Client.SendAsync(lockedRequest);
         lockedResponse.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
 
@@ -332,7 +335,7 @@ public sealed class AuthSecurityRegressionSpecifications
                 password = AuthTestClient.ValidPassword
             })
         };
-        unaffectedRequest.Headers.Add("X-Forwarded-For", "203.0.113.200");
+        unaffectedRequest.Headers.Add("X-Forwarded-For", sharedIp);
         using var unaffectedResponse = await _fixture.Client.SendAsync(unaffectedRequest);
         unaffectedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }

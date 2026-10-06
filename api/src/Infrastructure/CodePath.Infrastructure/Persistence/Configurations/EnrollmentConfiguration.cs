@@ -40,13 +40,13 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
         // Audit Fields (BaseEntity)
         builder.Property(e => e.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(e => e.CreatedBy)
             .HasMaxLength(100);
 
         builder.Property(e => e.UpdatedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(e => e.UpdatedBy)
             .HasMaxLength(100);

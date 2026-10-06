@@ -12,7 +12,7 @@ public sealed class VerifyOtpCommandValidator : AbstractValidator<VerifyOtpComma
 {
     public VerifyOtpCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email).NotEmpty().MaximumLength(254).EmailAddress();
         RuleFor(x => x.Otp)
             .NotEmpty()
             .Length(6)

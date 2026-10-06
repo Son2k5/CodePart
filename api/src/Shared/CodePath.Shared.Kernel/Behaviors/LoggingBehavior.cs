@@ -24,20 +24,16 @@ public sealed class LoggingBehavior<TRequest, TResponse>(ILogger<LoggingBehavior
             var response = await next();
             stopwatch.Stop();
 
-            if (response is Result<object> or IValidationResult)
+            if (response is IResult result && !result.IsSuccess)
             {
-                dynamic result = response;
-                if (!result.IsSuccess)
-                {
-                    logger.LogWarning(
+                logger.LogWarning(
                         "Kết thúc {RequestName} với kết quả thất bại. Mã lỗi: {ErrorCode}, Thông báo: {Error} ({ElapsedMilliseconds}ms)",
-                        requestName,
-                        (string?)result.ErrorCode ?? "UNKNOWN",
-                        (string?)result.Error ?? "None",
-                        stopwatch.ElapsedMilliseconds);
+                    requestName,
+                    result.ErrorCode ?? "UNKNOWN",
+                    result.Error ?? "None",
+                    stopwatch.ElapsedMilliseconds);
 
-                    return response;
-                }
+                return response;
             }
 
             logger.LogInformation(

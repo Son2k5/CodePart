@@ -22,6 +22,12 @@ public static class AdminSeeder
             return;
         }
 
+        if (!seedOptions.HasValidPasswords)
+        {
+            throw new InvalidOperationException(
+                "Admin seed passwords must satisfy the application password policy.");
+        }
+
         var adminsToSeed = new[]
         {
             new

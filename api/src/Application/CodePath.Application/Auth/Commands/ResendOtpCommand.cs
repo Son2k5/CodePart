@@ -11,7 +11,8 @@ public sealed record ResendOtpCommand(string Email) : IRequest<Result<string>>;
 
 public sealed class ResendOtpCommandValidator : AbstractValidator<ResendOtpCommand>
 {
-    public ResendOtpCommandValidator() => RuleFor(x => x.Email).NotEmpty().EmailAddress();
+    public ResendOtpCommandValidator() =>
+        RuleFor(x => x.Email).NotEmpty().MaximumLength(254).EmailAddress();
 }
 
 internal sealed class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand, Result<string>>
@@ -60,9 +61,7 @@ internal sealed class ResendOtpCommandHandler : IRequestHandler<ResendOtpCommand
         {
             await _otpService.InvalidateOtpAsync(normalizedEmail, issue.Otp);
             _logger.LogError(exception, "OTP resend email delivery failed for {Recipient}.", normalizedEmail);
-            return Result<string>.Failure(
-                "The verification email service is temporarily unavailable. Please try again later.",
-                ErrorCodes.InfraError);
+            return Result<string>.Success(NeutralResponse);
         }
     }
 }

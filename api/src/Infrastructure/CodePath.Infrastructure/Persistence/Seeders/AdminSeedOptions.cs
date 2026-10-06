@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using CodePath.Application.Auth;
 
 namespace CodePath.Infrastructure.Persistence.Seeders;
 
@@ -19,6 +20,10 @@ public sealed class AdminSeedOptions
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Admin01Password) &&
         !string.IsNullOrWhiteSpace(Admin02Password);
+
+    public bool HasValidPasswords =>
+        PasswordPolicy.IsValid(Admin01Password)
+        && PasswordPolicy.IsValid(Admin02Password);
 
     public static AdminSeedOptions FromConfiguration(IConfiguration config)
     {

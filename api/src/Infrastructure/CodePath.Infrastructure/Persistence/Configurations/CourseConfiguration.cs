@@ -33,7 +33,8 @@ public sealed class CourseConfiguration : IEntityTypeConfiguration<Course>
 
         builder.Property(c => c.JoinCode)
             .IsRequired()
-            .HasMaxLength(20);
+            .HasMaxLength(20)
+            .UseCollation("utf8mb4_0900_as_cs");
 
         builder.Property(c => c.MaxCapacity)
             .IsRequired()
@@ -49,13 +50,13 @@ public sealed class CourseConfiguration : IEntityTypeConfiguration<Course>
         // Audit Fields (BaseEntity)
         builder.Property(c => c.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(c => c.CreatedBy)
             .HasMaxLength(100);
 
         builder.Property(c => c.UpdatedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(c => c.UpdatedBy)
             .HasMaxLength(100);

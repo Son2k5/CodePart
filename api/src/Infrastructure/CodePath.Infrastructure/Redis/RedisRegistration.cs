@@ -15,15 +15,39 @@ public static class RedisRegistration
         IConfiguration configuration,
         IHostEnvironment environment)
     {
+        services.AddOptions<RedisConnectionOptions>()
+            .Bind(configuration.GetSection(RedisConnectionOptions.SectionName))
+            .Validate(options => options.ConnectRetry is >= 0 and <= 20, "Redis ConnectRetry is invalid.")
+            .Validate(options => options.ConnectTimeoutMilliseconds is >= 100 and <= 120000, "Redis ConnectTimeoutMilliseconds is invalid.")
+            .Validate(options => options.SyncTimeoutMilliseconds is >= 100 and <= 120000, "Redis SyncTimeoutMilliseconds is invalid.")
+            .Validate(options => options.KeepAliveSeconds is >= 1 and <= 3600, "Redis KeepAliveSeconds is invalid.")
+            .ValidateOnStart();
+
+        var redisOptions = configuration.GetSection(RedisConnectionOptions.SectionName)
+            .Get<RedisConnectionOptions>() ?? new RedisConnectionOptions();
         var connectionString = configuration.GetConnectionString("Redis");
+        ConfigurationOptions configurationOptions;
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException(
-                "Redis connection string 'ConnectionStrings:Redis' is missing in configuration.");
+            var password = configuration["Redis:Password"];
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException(
+                    "ConnectionStrings:Redis or the file secret Redis__Password must be configured.");
+            }
+
+            configurationOptions = new ConfigurationOptions
+            {
+                EndPoints = { configuration["Redis:Host"] ?? "redis" },
+                Password = password
+            };
+        }
+        else
+        {
+            configurationOptions = ConfigurationOptions.Parse(connectionString);
         }
 
-        var configurationOptions = ConfigurationOptions.Parse(connectionString);
         if (!environment.IsDevelopment()
             && !environment.IsEnvironment("Testing")
             && string.IsNullOrWhiteSpace(configurationOptions.Password))
@@ -33,8 +57,10 @@ public static class RedisRegistration
         }
 
         configurationOptions.AbortOnConnectFail = false;
-        configurationOptions.ConnectRetry = 3;
-        configurationOptions.ConnectTimeout = 5000;
+        configurationOptions.ConnectRetry = redisOptions.ConnectRetry;
+        configurationOptions.ConnectTimeout = redisOptions.ConnectTimeoutMilliseconds;
+        configurationOptions.SyncTimeout = redisOptions.SyncTimeoutMilliseconds;
+        configurationOptions.KeepAlive = redisOptions.KeepAliveSeconds;
 
         services.AddSingleton<IConnectionMultiplexer>(_ =>
             ConnectionMultiplexer.Connect(configurationOptions));

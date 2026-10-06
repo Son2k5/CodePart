@@ -6,6 +6,11 @@ public record GeneratedTokens(string AccessToken, string RefreshToken, int Expir
 
 public interface IJwtTokenService
 {
-    GeneratedTokens GenerateTokens(Guid userId, string email, UserRole role, UserStatus status);
+    GeneratedTokens GenerateTokens(
+        Guid userId,
+        string email,
+        UserRole role,
+        UserStatus status,
+        long securityVersion = 1);
     string HashRefreshToken(string refreshToken);
 }

@@ -23,7 +23,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Email)
             .IsRequired()
             .HasMaxLength(256)
-            .HasColumnType("character varying(256)");
+            .HasColumnType("varchar(256)");
 
         builder.Property(u => u.PasswordHash)
             .IsRequired()
@@ -41,24 +41,29 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.StudentId)
             .HasMaxLength(50)
-            .HasColumnType("character varying(50)");
+            .HasColumnType("varchar(50)")
+            .UseCollation("utf8mb4_0900_as_cs");
 
         builder.Property(u => u.EmailVerifiedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(u => u.LastLoginAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
+
+        builder.Property(u => u.SecurityVersion)
+            .HasDefaultValue(1L)
+            .IsRequired();
 
         // Audit Fields (BaseEntity)
         builder.Property(u => u.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(u => u.CreatedBy)
             .HasMaxLength(100);
 
         builder.Property(u => u.UpdatedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(u => u.UpdatedBy)
             .HasMaxLength(100);
@@ -70,7 +75,6 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(u => u.StudentId)
             .IsUnique()
-            .HasFilter("\"StudentId\" IS NOT NULL")
             .HasDatabaseName("ux_users_student_id");
 
         builder.HasIndex(u => u.Role)

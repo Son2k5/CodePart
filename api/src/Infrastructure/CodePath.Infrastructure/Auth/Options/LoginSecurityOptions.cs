@@ -2,9 +2,10 @@ namespace CodePath.Infrastructure.Auth.Options;
 
 public sealed class LoginSecurityOptions
 {
-    public const string SectionName = "AuthSecurity:Login";
+    public const string SectionName = "Auth:LoginProtection";
 
-    public int MaxFailures { get; init; } = 5;
-    public int FailureWindowMinutes { get; init; } = 15;
-    public int LockoutMinutes { get; init; } = 15;
+    public int BackoffThreshold { get; init; } = 5;
+    public int FailureCounterTtlMinutes { get; init; } = 15;
+    public int InitialBackoffSeconds { get; init; } = 2;
+    public int MaxBackoffSeconds { get; init; } = 60;
 }

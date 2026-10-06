@@ -68,7 +68,7 @@ public static class AuthEndpoints
         });
 
     private static SameSiteMode GetCookieSameSite(IConfiguration config)
-        => Enum.TryParse<SameSiteMode>(config["AuthSession:CookieSameSite"], true, out var sameSite)
+        => Enum.TryParse<SameSiteMode>(config["Auth:Session:CookieSameSite"], true, out var sameSite)
             ? sameSite
             : SameSiteMode.Strict;
 
@@ -118,6 +118,14 @@ public static class AuthEndpoints
         group.MapPost("/login", async (LoginRequest req, HttpContext httpContext, ISender sender, IConfiguration config) =>
         {
             var result = await sender.Send(new LoginCommand(req.Email, req.Password, GetClientIp(httpContext)));
+            if (result.RetryAfter is { } retryAfter)
+            {
+                httpContext.Response.Headers.RetryAfter = Math.Max(
+                    1,
+                    (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(
+                        System.Globalization.CultureInfo.InvariantCulture);
+            }
+
             if (result.IsSuccess)
             {
                 AppendRefreshTokenCookie(
@@ -131,6 +139,33 @@ public static class AuthEndpoints
         })
         .WithName("Login")
         .RequireRateLimiting("login-rate-limit");
+
+        group.MapPost("/forgot-password", async (
+            ForgotPasswordRequest req,
+            HttpContext httpContext,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ForgotPasswordCommand(
+                req.Email,
+                GetClientIp(httpContext)));
+            return result.ToHttpResult();
+        })
+        .WithName("ForgotPassword")
+        .RequireRateLimiting("password-reset-rate-limit");
+
+        group.MapPost("/reset-password", async (
+            ResetPasswordRequest req,
+            HttpContext httpContext,
+            ISender sender) =>
+        {
+            var result = await sender.Send(new ResetPasswordCommand(
+                req.Token,
+                req.NewPassword,
+                GetClientIp(httpContext)));
+            return result.ToHttpResult();
+        })
+        .WithName("ResetPassword")
+        .RequireRateLimiting("password-reset-rate-limit");
 
         group.MapPost("/refresh", async (HttpContext httpContext, ISender sender, IConfiguration config) =>
         {
@@ -192,7 +227,8 @@ public static class AuthEndpoints
 
             return Results.Ok(new { message = "Đăng xuất thành công." });
         })
-        .WithName("Logout");
+        .WithName("Logout")
+        .RequireRateLimiting("auth-rate-limit");
 
         group.MapPost("/logout-all", async (HttpContext httpContext, ISender sender, IConfiguration config) =>
         {

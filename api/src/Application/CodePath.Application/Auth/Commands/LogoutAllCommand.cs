@@ -29,11 +29,16 @@ internal sealed class LogoutAllCommandHandler : IRequestHandler<LogoutAllCommand
     public async Task<Result<bool>> Handle(LogoutAllCommand request, CancellationToken cancellationToken)
     {
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-        await _authDbContext.RevokeAllUserRefreshTokensAsync(
+        var revoked = await _authDbContext.RevokeAllUserSessionsAsync(
             request.UserId,
             utcNow,
             request.IpAddress,
             cancellationToken);
+
+        if (!revoked)
+        {
+            return Result<bool>.Failure("User not found.", ErrorCodes.NotFound);
+        }
 
         var remainingLifetime = request.TokenExpiresAtUtc.GetValueOrDefault() - utcNow;
         if (!string.IsNullOrWhiteSpace(request.Jti) && remainingLifetime > TimeSpan.Zero)

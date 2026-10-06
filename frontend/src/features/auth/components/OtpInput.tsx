@@ -1,4 +1,5 @@
-import React, { useState, useRef, KeyboardEvent, useEffect } from 'react';
+import React, { useRef } from 'react';
+import type { KeyboardEvent } from 'react';
 
 interface OtpInputProps {
   length?: number;
@@ -8,19 +9,8 @@ interface OtpInputProps {
 }
 
 export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange, error }) => {
-  const [otp, setOtp] = useState<string[]>(Array(length).fill(''));
+  const otp = Array.from({ length }, (_, index) => value[index] ?? '');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    // Sync external value
-    if (value.length <= length) {
-      const newOtp = Array(length).fill('');
-      value.split('').forEach((char, idx) => {
-        newOtp[idx] = char;
-      });
-      setOtp(newOtp);
-    }
-  }, [value, length]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const val = e.target.value;
@@ -29,7 +19,6 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
     const newOtp = [...otp];
     // Allow only last char if pasted multiple
     newOtp[index] = val.substring(val.length - 1);
-    setOtp(newOtp);
     onChange(newOtp.join(''));
 
     // Move to next
@@ -53,7 +42,6 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
     pastedData.forEach((char, idx) => {
       newOtp[idx] = char;
     });
-    setOtp(newOtp);
     onChange(newOtp.join(''));
     
     // Focus last filled
@@ -69,7 +57,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
         {otp.map((digit, index) => (
           <input
             key={index}
-            ref={(el) => (inputRefs.current[index] = el)}
+            ref={(el) => { inputRefs.current[index] = el; }}
             type="text"
             inputMode="numeric"
             maxLength={1}

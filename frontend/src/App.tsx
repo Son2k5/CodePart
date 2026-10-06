@@ -1,15 +1,10 @@
+import { useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
-import { LoginPage } from './features/auth/pages/LoginPage';
-import { RegisterPage } from './features/auth/pages/RegisterPage';
-import { VerifyOtpPage } from './features/auth/pages/VerifyOtpPage';
-import { ForgotPasswordPage } from './features/auth/pages/ForgotPasswordPage';
-import { ResetPasswordPage } from './features/auth/pages/ResetPasswordPage';
-import { PendingApprovalPage } from './features/auth/pages/PendingApprovalPage';
 import { GuestRoute } from './routes/GuestRoute';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { RoleGuard } from './routes/RoleGuard';
 import { useAuthStore } from './features/auth/store/authStore';
-import { ExercisePage } from './features/online-judge/pages/ExercisePage';
+import { refreshSession } from './lib/axios';
 
 const DashboardRedirect = () => {
   const { user } = useAuthStore();
@@ -23,12 +18,30 @@ const router = createBrowserRouter([
   {
     element: <GuestRoute />,
     children: [
-      { path: '/login', element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
-      { path: '/verify-otp', element: <VerifyOtpPage /> },
-      { path: '/forgot-password', element: <ForgotPasswordPage /> },
-      { path: '/reset-password', element: <ResetPasswordPage /> },
-      { path: '/pending-approval', element: <PendingApprovalPage /> },
+      {
+        path: '/login',
+        lazy: async () => ({ Component: (await import('./features/auth/pages/LoginPage')).LoginPage }),
+      },
+      {
+        path: '/register',
+        lazy: async () => ({ Component: (await import('./features/auth/pages/RegisterPage')).RegisterPage }),
+      },
+      {
+        path: '/verify-otp',
+        lazy: async () => ({ Component: (await import('./features/auth/pages/VerifyOtpPage')).VerifyOtpPage }),
+      },
+      {
+        path: '/forgot-password',
+        lazy: async () => ({ Component: (await import('./features/auth/pages/ForgotPasswordPage')).ForgotPasswordPage }),
+      },
+      {
+        path: '/reset-password',
+        lazy: async () => ({ Component: (await import('./features/auth/pages/ResetPasswordPage')).ResetPasswordPage }),
+      },
+      {
+        path: '/pending-approval',
+        lazy: async () => ({ Component: (await import('./features/auth/pages/PendingApprovalPage')).PendingApprovalPage }),
+      },
     ],
   },
   {
@@ -50,7 +63,13 @@ const router = createBrowserRouter([
         element: <RoleGuard allowedRoles={['Student']} />,
         children: [
           { path: '/courses', element: <div className="p-8">Student Courses</div> },
-          { path: '/exercise/:slug', element: <ExercisePage /> },
+          {
+            path: '/exercise/:slug',
+            lazy: async () => {
+              const { ExercisePage } = await import('./features/online-judge/pages/ExercisePage');
+              return { Component: ExercisePage };
+            },
+          },
         ],
       },
       { path: '/', element: <DashboardRedirect /> },
@@ -59,5 +78,15 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+
+  useEffect(() => {
+    void refreshSession().catch(() => undefined);
+  }, []);
+
+  if (!isInitialized) {
+    return <div className="min-h-screen bg-white" aria-label="Loading session" />;
+  }
+
   return <RouterProvider router={router} />;
 }

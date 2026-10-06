@@ -27,6 +27,8 @@ public sealed class RunCodeCommandValidator : AbstractValidator<RunCodeCommand>
 internal sealed class RunCodeCommandHandler(IExerciseDbContext dbContext, ICodeExecutionService runner)
     : IRequestHandler<RunCodeCommand, Result<ExecutionResultDto>>
 {
+    private const int MaximumOutputLength = 16_384;
+
     public async Task<Result<ExecutionResultDto>> Handle(RunCodeCommand request, CancellationToken cancellationToken)
     {
         if (!runner.Supports(request.Language))
@@ -50,7 +52,7 @@ internal sealed class RunCodeCommandHandler(IExerciseDbContext dbContext, ICodeE
 
             results.Add(new TestCaseResultDto(
                 test.Id, test.Order, outcome.Status.ToString(), test.Input, test.Expected,
-                outcome.StandardOutput, outcome.ErrorMessage, outcome.RuntimeMs, outcome.MemoryKb));
+                Truncate(outcome.StandardOutput), Truncate(outcome.ErrorMessage), outcome.RuntimeMs, outcome.MemoryKb));
 
             if (outcome.Status is SubmissionStatus.CompilationError or SubmissionStatus.SystemError)
                 break;
@@ -66,4 +68,9 @@ internal sealed class RunCodeCommandHandler(IExerciseDbContext dbContext, ICodeE
             results.Where(result => result.MemoryKb.HasValue).Max(result => result.MemoryKb),
             results));
     }
+
+    private static string? Truncate(string? value) =>
+        value is null || value.Length <= MaximumOutputLength
+            ? value
+            : value[..MaximumOutputLength];
 }

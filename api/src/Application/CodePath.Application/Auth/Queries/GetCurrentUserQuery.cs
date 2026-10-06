@@ -1,4 +1,4 @@
-using CodePath.Application.Users.Queries;
+using CodePath.Application.Users.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using MediatR;
 
@@ -10,18 +10,18 @@ public sealed record GetCurrentUserQuery(Guid UserId) : IRequest<Result<UserProf
 
 internal sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, Result<UserProfileResponse>>
 {
-    private readonly ISender _sender;
-    public GetCurrentUserQueryHandler(ISender sender) => _sender = sender;
+    private readonly IUsersDbContext _usersDbContext;
+    public GetCurrentUserQueryHandler(IUsersDbContext usersDbContext) =>
+        _usersDbContext = usersDbContext;
 
     public async Task<Result<UserProfileResponse>> Handle(GetCurrentUserQuery request, CancellationToken cancellationToken)
     {
-        var userResult = await _sender.Send(new GetUserByIdQuery(request.UserId), cancellationToken);
-        if (!userResult.IsSuccess || userResult.Value is null)
+        var user = await _usersDbContext.GetByIdReadOnlyAsync(request.UserId, cancellationToken);
+        if (user is null)
         {
             return Result<UserProfileResponse>.Failure("Không tìm thấy thông tin người dùng.");
         }
 
-        var user = userResult.Value;
         return Result<UserProfileResponse>.Success(new UserProfileResponse(
             user.Id, user.Email, user.FullName, user.Role.ToString(), user.Status.ToString()));
     }

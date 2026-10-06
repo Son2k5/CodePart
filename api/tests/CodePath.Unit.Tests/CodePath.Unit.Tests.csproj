@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>CodePath.Unit.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Moq" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Application\CodePath.Application\CodePath.Application.csproj" />
+    <ProjectReference Include="..\..\src\Infrastructure\CodePath.Infrastructure\CodePath.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Api\CodePath.Api\CodePath.Api.csproj" />
+  </ItemGroup>
+</Project>

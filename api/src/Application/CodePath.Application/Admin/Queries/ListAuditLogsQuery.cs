@@ -53,12 +53,18 @@ internal sealed class ListAuditLogsQueryHandler
             log.TargetUserId,
             log.OccurredAt,
             log.IpAddress,
-            JsonDocument.Parse(log.DataJson).RootElement.Clone())).ToArray();
+            ParseAuditData(log.DataJson))).ToArray();
 
         var nextCursor = hasMore && pageLogs.Length > 0
             ? AdminCursor.Encode(pageLogs[^1].OccurredAt, pageLogs[^1].Id)
             : null;
 
         return Result<CursorPage<AuditLogDto>>.Success(new(items, nextCursor));
+    }
+
+    private static JsonElement ParseAuditData(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
     }
 }

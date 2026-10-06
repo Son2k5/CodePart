@@ -21,6 +21,7 @@ public static class ExerciseEndpoints
             return result.ToHttpResult();
         })
         .WithName("GetExercise")
+        .RequireRateLimiting("public-read-rate-limit")
         .Produces(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status404NotFound);
 

@@ -56,6 +56,29 @@ public sealed class AuthFlowTests
     }
 
     [Fact]
+    public async Task Login_WithUnverifiedEmail_ShouldReturnStableErrorCode()
+    {
+        const string email = "2026000024@hanu.edu.vn";
+        using var registerResponse = await _fixture.Client.PostAsJsonAsync("/api/auth/register", new
+        {
+            fullName = "Unverified Student",
+            email,
+            password = AuthTestClient.ValidPassword
+        });
+        registerResponse.EnsureSuccessStatusCode();
+
+        using var response = await _fixture.Client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email,
+            password = AuthTestClient.ValidPassword
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        problem.GetProperty("code").GetString().Should().Be("UNVERIFIED_EMAIL");
+    }
+
+    [Fact]
     public async Task VerifyOtp_AfterFiveInvalidAttempts_ShouldRejectCorrectOtp()
     {
         const string email = "2026000003@hanu.edu.vn";

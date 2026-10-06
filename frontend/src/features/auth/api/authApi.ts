@@ -1,11 +1,10 @@
 import { axiosInstance } from '../../../lib/axios';
-import { 
-  LoginInput, 
-  RegisterStudentInput, 
-  RegisterTeacherInput, 
-  VerifyOtpInput, 
-  ForgotPasswordInput, 
-  ResetPasswordInput 
+import type {
+  LoginInput,
+  RegisterStudentInput,
+  RegisterTeacherInput,
+  VerifyOtpInput,
+  ForgotPasswordInput
 } from '../schemas/authSchemas';
 import type { LoginResponse } from '../types/auth.types';
 
@@ -16,12 +15,12 @@ export const authApi = {
   },
 
   registerStudent: async (data: Omit<RegisterStudentInput, 'confirmPassword'>) => {
-    const response = await axiosInstance.post('/auth/register/student', data);
+    const response = await axiosInstance.post('/auth/register', data);
     return response.data;
   },
 
   registerTeacher: async (data: Omit<RegisterTeacherInput, 'confirmPassword'>) => {
-    const response = await axiosInstance.post('/auth/register/teacher', data);
+    const response = await axiosInstance.post('/auth/register', data);
     return response.data;
   },
 
@@ -45,8 +44,11 @@ export const authApi = {
     return response.data;
   },
 
-  resetPassword: async (data: Omit<ResetPasswordInput, 'confirmPassword'>) => {
-    const response = await axiosInstance.post('/auth/reset-password', data);
+  resetPassword: async (data: { token: string; newPassword: string }) => {
+    const response = await axiosInstance.post('/auth/reset-password', {
+      token: data.token,
+      newPassword: data.newPassword,
+    });
     return response.data;
   },
 };

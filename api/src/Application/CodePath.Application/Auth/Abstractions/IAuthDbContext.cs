@@ -14,6 +14,12 @@ public interface IAuthDbContext
     Task<int> RevokeTokenFamilyAsync(Guid familyId, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
     Task<int> RevokeRefreshTokenAsync(string tokenHash, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
     Task<int> RevokeAllUserRefreshTokensAsync(Guid userId, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
+    Task<bool> RevokeAllUserSessionsAsync(Guid userId, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
+    Task ReplaceActivePasswordResetTokenAsync(PasswordResetToken token, DateTime utcNow, CancellationToken cancellationToken = default);
+    Task<PasswordResetCompletion?> TryConsumePasswordResetTokenAsync(string tokenHash, string newPasswordHash, DateTime utcNow, string? ipAddress, CancellationToken cancellationToken = default);
     Task<int> DeleteExpiredRefreshTokensAsync(DateTime expiredBeforeUtc, CancellationToken cancellationToken = default);
+    Task<int> DeleteExpiredPasswordResetTokensAsync(DateTime expiredBeforeUtc, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record PasswordResetCompletion(Guid UserId, string Email);

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using CodePath.Application.Auth;
 using CodePath.Application.Auth.Abstractions;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Users.Entities;
@@ -24,13 +25,13 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Email)
             .NotEmpty()
+            .MaximumLength(254)
             .Must(email => HanuEmailRegex.IsMatch(email?.Trim() ?? string.Empty))
             .WithMessage("Only @hanu.edu.vn email addresses are accepted.");
         RuleFor(x => x.Password)
             .NotEmpty()
-            .MinimumLength(12)
-            .MaximumLength(128)
-            .WithMessage("Password must contain between 12 and 128 characters.");
+            .Must(PasswordPolicy.IsValid)
+            .WithMessage("Password must be 12-128 characters and contain lowercase, uppercase, a number, and a special character.");
     }
 }
 
@@ -69,7 +70,6 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
     public async Task<Result<string>> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
         var normalizedEmail = EmailNormalizer.Normalize(request.Email);
-        var passwordHash = _passwordHasher.HashPassword(request.Password);
         var existingUser = await _usersDbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
 
         if (existingUser?.EmailVerifiedAt is not null)
@@ -88,26 +88,12 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
                 return Result<string>.Success(NeutralResponse);
             }
 
-            var updateResult = await CreateOrUpdateUserAsync(
-                request,
-                normalizedEmail,
-                passwordHash,
-                existingUser,
-                cancellationToken);
-            if (!updateResult.IsSuccess)
-            {
-                await _otpService.InvalidateOtpAsync(normalizedEmail, existingIssue.Otp);
-                return Result<string>.Success(NeutralResponse);
-            }
-
             return await SendOtpAsync(normalizedEmail, existingIssue.Otp, cancellationToken);
         }
 
-        var createResult = await CreateOrUpdateUserAsync(
+        var createResult = await CreateUserAsync(
             request,
             normalizedEmail,
-            passwordHash,
-            existingUser: null,
             cancellationToken);
         if (!createResult.IsSuccess)
         {
@@ -123,33 +109,23 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
         return await SendOtpAsync(normalizedEmail, issue.Otp, cancellationToken);
     }
 
-    private async Task<Result<Guid>> CreateOrUpdateUserAsync(
+    private async Task<Result<Guid>> CreateUserAsync(
         RegisterCommand request,
         string normalizedEmail,
-        string passwordHash,
-        User? existingUser,
         CancellationToken cancellationToken)
     {
         var isStudent = StudentRegex.IsMatch(normalizedEmail);
         var role = isStudent ? UserRole.Student : UserRole.Teacher;
         var studentId = isStudent ? normalizedEmail.Split('@')[0] : null;
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var passwordHash = _passwordHasher.HashPassword(request.Password);
 
         try
         {
-            User user;
-            if (existingUser is not null)
-            {
-                existingUser.UpdateUnverifiedAccount(request.FullName, passwordHash, role, studentId, utcNow);
-                user = existingUser;
-            }
-            else
-            {
-                user = role == UserRole.Student
-                    ? User.CreateStudent(request.FullName, normalizedEmail, passwordHash, studentId!, utcNow)
-                    : User.CreateTeacher(request.FullName, normalizedEmail, passwordHash, utcNow);
-                await _usersDbContext.AddAsync(user, cancellationToken);
-            }
+            var user = role == UserRole.Student
+                ? User.CreateStudent(request.FullName, normalizedEmail, passwordHash, studentId!, utcNow)
+                : User.CreateTeacher(request.FullName, normalizedEmail, passwordHash, utcNow);
+            await _usersDbContext.AddAsync(user, cancellationToken);
 
             await _usersDbContext.SaveChangesAsync(cancellationToken);
             return Result<Guid>.Success(user.Id);
@@ -174,9 +150,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
         {
             await _otpService.InvalidateOtpAsync(normalizedEmail, otp);
             _logger.LogError(exception, "OTP email delivery failed for {Recipient}.", normalizedEmail);
-            return Result<string>.Failure(
-                "The verification email service is temporarily unavailable. Please try again later.",
-                ErrorCodes.InfraError);
+            return Result<string>.Success(NeutralResponse);
         }
     }
 }

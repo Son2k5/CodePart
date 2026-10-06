@@ -22,9 +22,6 @@ public sealed class RefreshToken : BaseEntity
 
     private RefreshToken() { }
 
-    public static readonly TimeSpan DefaultLifetime = TimeSpan.FromDays(7);
-    public static readonly TimeSpan DefaultAbsoluteLifetime = TimeSpan.FromDays(30);
-
     public static RefreshToken Create(
         Guid userId,
         string tokenHash,
@@ -58,30 +55,16 @@ public sealed class RefreshToken : BaseEntity
         };
     }
 
-    public static RefreshToken CreateWithDefaultLifetime(
-        Guid userId,
-        string tokenHash,
-        DateTime utcNow,
-        string? createdByIp = null)
-    {
-        return Create(
-            userId,
-            tokenHash,
-            utcNow.Add(DefaultLifetime),
-            utcNow.Add(DefaultAbsoluteLifetime),
-            utcNow,
-            createdByIp: createdByIp);
-    }
-
     public static RefreshToken CreateReplacement(
         RefreshToken parent,
         string tokenHash,
         DateTime utcNow,
+        TimeSpan lifetime,
         string? createdByIp = null)
         => Create(
             parent.UserId,
             tokenHash,
-            utcNow.Add(DefaultLifetime),
+            utcNow.Add(lifetime),
             parent.AbsoluteExpiresAt,
             utcNow,
             parent.FamilyId,

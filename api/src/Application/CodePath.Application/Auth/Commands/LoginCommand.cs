@@ -1,15 +1,38 @@
 using CodePath.Application.Auth.Abstractions;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auth.Entities;
+using CodePath.Domain.Users.Entities;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using FluentValidation;
 using MediatR;
 using System.Text.Json.Serialization;
+using CodePath.Application.Auth;
 
 namespace CodePath.Application.Auth.Commands;
 
-public sealed record LoginResponse(string AccessToken, int ExpiresIn, string TokenType = "Bearer")
+public sealed record AuthenticatedUserResponse(
+    Guid Id,
+    string Email,
+    string FullName,
+    string Role,
+    string Status,
+    DateTime? EmailVerifiedAt)
+{
+    internal static AuthenticatedUserResponse From(User user) => new(
+        user.Id,
+        user.Email,
+        user.FullName,
+        user.Role.ToString(),
+        user.Status.ToString(),
+        user.EmailVerifiedAt);
+}
+
+public sealed record LoginResponse(
+    string AccessToken,
+    int ExpiresIn,
+    AuthenticatedUserResponse User,
+    string TokenType = "Bearer")
 {
     [JsonIgnore]
     public string RefreshToken { get; init; } = string.Empty;
@@ -24,8 +47,8 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
 {
     public LoginCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.Password).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.Email).NotEmpty().MaximumLength(254).EmailAddress();
+        RuleFor(x => x.Password).NotEmpty().MaximumLength(PasswordPolicy.MaximumLength);
     }
 }
 
@@ -36,6 +59,8 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IAuthDbContext _authDbContext;
     private readonly ILoginAttemptService _loginAttemptService;
+    private readonly IAuthSessionPolicy _authSessionPolicy;
+    private readonly ILoginConcurrencyLimiter _loginConcurrencyLimiter;
     private readonly TimeProvider _timeProvider;
 
     private const string GenericAuthErrorMessage = "Email hoặc mật khẩu không chính xác.";
@@ -46,6 +71,8 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
         IJwtTokenService jwtTokenService,
         IAuthDbContext authDbContext,
         ILoginAttemptService loginAttemptService,
+        IAuthSessionPolicy authSessionPolicy,
+        ILoginConcurrencyLimiter loginConcurrencyLimiter,
         TimeProvider timeProvider)
     {
         _usersDbContext = usersDbContext;
@@ -53,6 +80,8 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
         _jwtTokenService = jwtTokenService;
         _authDbContext = authDbContext;
         _loginAttemptService = loginAttemptService;
+        _authSessionPolicy = authSessionPolicy;
+        _loginConcurrencyLimiter = loginConcurrencyLimiter;
         _timeProvider = timeProvider;
     }
 
@@ -60,38 +89,66 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
     {
         var normalizedEmail = EmailNormalizer.Normalize(request.Email);
 
-        var lockoutRemaining = await _loginAttemptService.GetLockoutRemainingAsync(normalizedEmail);
-        if (lockoutRemaining.HasValue && lockoutRemaining.Value > TimeSpan.Zero)
+        var attemptDecision = await _loginAttemptService.GetDecisionAsync(
+            normalizedEmail,
+            request.IpAddress,
+            cancellationToken);
+        if (attemptDecision.IsInBackoff)
         {
-            return CreateLockoutResult(lockoutRemaining.Value);
+            return CreateBackoffResult(attemptDecision);
         }
 
         var user = await _usersDbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
-        if (user is null)
+        var concurrency = await _loginConcurrencyLimiter.AcquireAsync(
+            request.IpAddress,
+            cancellationToken);
+        if (!concurrency.IsAcquired)
         {
-            _passwordHasher.SimulateVerification();
-            return await RecordFailureAsync(normalizedEmail);
+            return Result<LoginResponse>.Failure(
+                "The login service is busy. Please try again shortly.",
+                ErrorCodes.TooManyRequests,
+                concurrency.RetryAfter);
         }
 
-        var isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
-        if (!isPasswordValid)
+        bool isPasswordValid;
+        string? upgradedPasswordHash = null;
+        await using (concurrency.Lease!)
         {
-            return await RecordFailureAsync(normalizedEmail);
+            if (user is null)
+            {
+                _passwordHasher.SimulateVerification();
+                isPasswordValid = false;
+            }
+            else
+            {
+                isPasswordValid = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
+                if (isPasswordValid && _passwordHasher.NeedsRehash(user.PasswordHash))
+                {
+                    upgradedPasswordHash = _passwordHasher.HashPassword(request.Password);
+                }
+            }
+        }
+
+        if (user is null || !isPasswordValid)
+        {
+            return await RecordFailureAsync(normalizedEmail, request.IpAddress, cancellationToken);
         }
 
         if (!user.EmailVerifiedAt.HasValue)
         {
-            return Result<LoginResponse>.Failure("Email chưa được xác thực. Vui lòng xác thực OTP trước khi đăng nhập.", "UNAUTHORIZED");
+            return Result<LoginResponse>.Failure(
+                "Email chưa được xác thực. Vui lòng xác thực OTP trước khi đăng nhập.",
+                ErrorCodes.AccountUnverified);
         }
 
         switch (user.Status)
         {
             case UserStatus.Pending:
-                return Result<LoginResponse>.Failure("Tài khoản Giảng viên đang chờ Quản trị viên cấp quyền.", "ACCOUNT_PENDING");
+                return Result<LoginResponse>.Failure("Tài khoản Giảng viên đang chờ Quản trị viên cấp quyền.", ErrorCodes.AccountPending);
             case UserStatus.Rejected:
-                return Result<LoginResponse>.Failure("Tài khoản của bạn đã bị từ chối.", "ACCOUNT_REJECTED");
+                return Result<LoginResponse>.Failure("Tài khoản của bạn đã bị từ chối.", ErrorCodes.AccountRejected);
             case UserStatus.Disabled:
-                return Result<LoginResponse>.Failure("Tài khoản của bạn đã bị vô hiệu hóa.", "ACCOUNT_DISABLED");
+                return Result<LoginResponse>.Failure("Tài khoản của bạn đã bị vô hiệu hóa.", ErrorCodes.AccountDisabled);
             case UserStatus.Active:
                 break;
             default:
@@ -101,38 +158,56 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
         user.RecordLoginSuccess(utcNow);
 
-        var tokens = _jwtTokenService.GenerateTokens(user.Id, user.Email, user.Role, user.Status);
+        if (upgradedPasswordHash is not null)
+        {
+            user.UpgradePasswordHash(upgradedPasswordHash, utcNow);
+        }
+
+        var tokens = _jwtTokenService.GenerateTokens(
+            user.Id, user.Email, user.Role, user.Status, user.SecurityVersion);
         var tokenHash = _jwtTokenService.HashRefreshToken(tokens.RefreshToken);
 
-        var refreshTokenEntity = RefreshToken.CreateWithDefaultLifetime(
+        var refreshTokenEntity = RefreshToken.Create(
             user.Id,
             tokenHash,
+            utcNow.Add(_authSessionPolicy.RefreshTokenLifetime),
+            utcNow.Add(_authSessionPolicy.RefreshTokenAbsoluteLifetime),
             utcNow,
-            request.IpAddress);
+            createdByIp: request.IpAddress);
 
         await _authDbContext.AddRefreshTokenAsync(refreshTokenEntity, cancellationToken);
         await _authDbContext.SaveChangesAsync(cancellationToken);
-        await _loginAttemptService.ResetAsync(normalizedEmail);
+        await _loginAttemptService.ResetAsync(normalizedEmail, request.IpAddress, cancellationToken);
 
         return Result<LoginResponse>.Success(new LoginResponse(
             tokens.AccessToken,
-            tokens.ExpiresInSeconds)
+            tokens.ExpiresInSeconds,
+            AuthenticatedUserResponse.From(user))
         {
             RefreshToken = tokens.RefreshToken,
             RefreshTokenExpiresAt = refreshTokenEntity.ExpiresAt
         });
     }
 
-    private async Task<Result<LoginResponse>> RecordFailureAsync(string normalizedEmail)
+    private async Task<Result<LoginResponse>> RecordFailureAsync(
+        string normalizedEmail,
+        string? ipAddress,
+        CancellationToken cancellationToken)
     {
-        var failure = await _loginAttemptService.RecordFailureAsync(normalizedEmail);
-        return failure.IsLocked
-            ? CreateLockoutResult(failure.RetryAfter ?? TimeSpan.FromMinutes(15))
-            : Result<LoginResponse>.Failure(GenericAuthErrorMessage, ErrorCodes.Unauthorized);
+        var decision = await _loginAttemptService.RecordFailureAsync(
+            normalizedEmail,
+            ipAddress,
+            cancellationToken);
+        return decision.IsInBackoff
+            ? CreateBackoffResult(decision)
+            : Result<LoginResponse>.Failure(
+                GenericAuthErrorMessage,
+                ErrorCodes.Unauthorized);
     }
 
-    private static Result<LoginResponse> CreateLockoutResult(TimeSpan remaining)
+    private static Result<LoginResponse> CreateBackoffResult(LoginAttemptDecision decision)
         => Result<LoginResponse>.Failure(
-            $"Too many failed login attempts. Try again in {Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes))} minute(s).",
-            ErrorCodes.TooManyRequests);
+            "Too many failed login attempts. Please try again shortly.",
+            ErrorCodes.TooManyRequests,
+            decision.RetryAfter);
 }

@@ -54,7 +54,11 @@ public sealed class Judge0CodeExecutionService : ICodeExecutionService
             Convert.ToBase64String(Encoding.UTF8.GetBytes(standardInput)),
             expectedOutput is null ? null : Convert.ToBase64String(Encoding.UTF8.GetBytes(expectedOutput)),
             Math.Max(0.1, timeLimitMs / 1000d),
-            memoryLimitKb);
+            Math.Max(1d, timeLimitMs / 1000d * 2d),
+            memoryLimitKb,
+            1_024,
+            64,
+            false);
 
         using var message = new HttpRequestMessage(
             HttpMethod.Post,
@@ -127,7 +131,11 @@ public sealed class Judge0CodeExecutionService : ICodeExecutionService
         [property: JsonPropertyName("stdin")] string Stdin,
         [property: JsonPropertyName("expected_output")] string? ExpectedOutput,
         [property: JsonPropertyName("cpu_time_limit")] double CpuTimeLimit,
-        [property: JsonPropertyName("memory_limit")] int MemoryLimit);
+        [property: JsonPropertyName("wall_time_limit")] double WallTimeLimit,
+        [property: JsonPropertyName("memory_limit")] int MemoryLimit,
+        [property: JsonPropertyName("max_file_size")] int MaxFileSize,
+        [property: JsonPropertyName("max_processes_and_or_threads")] int MaxProcessesAndThreads,
+        [property: JsonPropertyName("enable_network")] bool EnableNetwork);
 
     private sealed record Judge0SubmissionResponse(
         [property: JsonPropertyName("stdout")] string? Stdout,

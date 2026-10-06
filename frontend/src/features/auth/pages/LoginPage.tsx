@@ -1,8 +1,9 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
-import { loginSchema, LoginInput } from '../schemas/authSchemas';
+import { Link } from 'react-router-dom';
+import { loginSchema } from '../schemas/authSchemas';
+import type { LoginInput } from '../schemas/authSchemas';
 import { useLogin } from '../hooks/useAuth';
 import { AuthLayout } from '../components/AuthLayout';
 import { PasswordInput } from '../components/PasswordInput';
@@ -12,7 +13,6 @@ export const LoginPage: React.FC = () => {
     resolver: zodResolver(loginSchema),
   });
   const { mutate: login, isPending } = useLogin();
-  const navigate = useNavigate();
 
   const onSubmit = (data: LoginInput) => {
     login(data);

@@ -1,15 +1,19 @@
 # CodePath – Phase 1: Authentication & User Management Flow
 
+> Lưu ý: các đoạn mã theo cấu trúc `Modules/*` bên dưới là tài liệu thiết kế lịch sử.
+> Mã nguồn hiện tại dùng Clean Architecture theo các layer thuần và MySQL 8.4; mã nguồn
+> cùng migration trong project là nguồn sự thật, không chạy lại các migration PostgreSQL mẫu cũ.
+
 Tài liệu thiết kế chi tiết và toàn bộ source code mẫu các tầng (Domain, Application, Infrastructure, API, Configuration) cho Phase 1: Register / Login / Logout (School Email `@hanu.edu.vn`), phân loại tài khoản, OTP xác thực Redis, JWT token rotation, blacklist logout và phân quyền.
 
 ---
 
 ## 1. Tổng quan Kiến trúc & Nguyên tắc Thiết kế
 
-- **Tech Stack**: ASP.NET Core 8 Web API, EF Core 8, PostgreSQL, Redis 7, BCrypt.Net, System.IdentityModel.Tokens.Jwt.
-- **Mô hình**: Clean Architecture kết hợp Modular Monolith.
-  - **Module `Users`**: Quản lý thông tin cốt lõi của người dùng, phân quyền, trạng thái và lưu trữ tại Postgres schema `users`.
-  - **Module `Auth`**: Quản lý phiên làm việc (Refresh Tokens tại Postgres schema `auth`), xác thực mật khẩu, cấp/thu hồi JWT, quản lý OTP và Blacklist token tại Redis.
+- **Tech Stack**: ASP.NET Core 8 Web API, EF Core 8, MySQL 8.4, Redis 7, BCrypt.Net, System.IdentityModel.Tokens.Jwt.
+- **Mô hình hiện tại**: Clean Architecture theo các layer thuần, không phải Modular Monolith.
+  - **Users**: Quản lý thông tin cốt lõi của người dùng, phân quyền, trạng thái và lưu trữ trong MySQL.
+  - **Auth**: Quản lý phiên làm việc (Refresh Tokens trong MySQL), xác thực mật khẩu, cấp/thu hồi JWT, quản lý OTP và Blacklist token tại Redis.
   - **Quy tắc phụ thuộc một chiều (Strict One-Way Dependency - Tránh Circular Dependency)**:
     - Tầng `Application` chỉ phụ thuộc `Domain` và `Shared.Kernel`. Tầng này định nghĩa các Interface trừu tượng (`IUsersDbContext`, `IAuthDbContext`, `IPasswordHasher`, `IJwtTokenService`, `IOtpService`,...).
     - Tầng `Infrastructure` tham chiếu `Application` để triển khai các Interface này (kết nối DB, Redis, Token).
@@ -168,7 +172,7 @@ public class ForbiddenException : AppException
 
 ### 3.4. Cập nhật Middleware Bắt Lỗi (Problem Details - Chống Rò Rỉ Thông Tin & Ghi Log Đầy Đủ)
 
-Middleware ghi log chi tiết mọi unhandled exception kèm `TraceId` và tuyệt đối **không rò rỉ** raw message nội bộ (PostgreSQL, connection string, stack trace) cho client ở nhánh lỗi 500:
+Middleware ghi log chi tiết mọi unhandled exception kèm `TraceId` và tuyệt đối **không rò rỉ** raw message nội bộ (MySQL, connection string, stack trace) cho client ở nhánh lỗi 500:
 
 ```csharp
 // File: src/Shared/CodePath.Shared.Web/Extensions/ExceptionHandlingExtensions.cs
@@ -526,7 +530,7 @@ public partial class Update_User_For_Phase1 : Migration
             nullable: false,
             defaultValue: "Active");
 
-        // Convert dữ liệu cũ Role từ int sang varchar với PostgreSQL USING CASE (0->Student, 1->Teacher, 2->Admin)
+        // Ví dụ lịch sử của migration PostgreSQL cũ; không chạy trên MySQL.
         migrationBuilder.Sql(@"
             ALTER TABLE users.users 
             ALTER COLUMN ""Role"" TYPE character varying(50) 
@@ -800,7 +804,7 @@ using CodePath.Shared.Kernel.Enums;
 using CodePath.Shared.Kernel.Exceptions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
+using MySqlConnector;
 
 namespace CodePath.Modules.Users.Application.Features.Users.Commands;
 
@@ -845,7 +849,7 @@ internal sealed class CreateUserCommandHandler : IRequestHandler<CreateUserComma
             await _dbContext.SaveChangesAsync(cancellationToken);
             return Result<Guid>.Success(user.Id);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == PostgresErrorCodes.UniqueViolation)
+        catch (DbUpdateException ex) when (ex.InnerException is MySqlException { ErrorCode: MySqlErrorCode.DuplicateKeyEntry })
         {
             throw new ConflictException("Email or student code already exists.");
         }
@@ -2434,7 +2438,7 @@ public partial class Program { }
 | Email sinh viên `20231234@hanu.edu.vn` | Phân loại `Role = Student`, `Status = Active`, `StudentId = 20231234` |
 | Email giảng viên `sondo@hanu.edu.vn` | Phân loại `Role = Teacher`, `Status = Pending`, `StudentId = null` |
 | Client cố tình gửi kèm `role` hoặc `status` trong body | DTO loại bỏ hoàn toàn, không map vào Command |
-| 2 request đăng ký cùng lúc 1 email chưa từng có (race condition) | Bắt `DbUpdateException` (Postgres Unique Violation) -> trả 409 Conflict |
+| 2 request đăng ký cùng lúc 1 email chưa từng có (race condition) | Bắt `DbUpdateException` (MySQL duplicate key) -> trả 409 Conflict |
 | Email squatting: Đăng ký email đã có người đăng ký nhưng chưa verify OTP | Cho phép cập nhật lại thông tin/mật khẩu mới, cấp lại mã OTP mới mà không báo lỗi 409 Conflict |
 | Đăng ký email đã được xác thực trước đó | Báo lỗi 409 Conflict: `"Email already exists in the system."` |
 | Đăng nhập tài khoản chưa verify OTP | Trả HTTP 401 kèm JSON `{ error: "Email chưa được xác thực...", code: "UNAUTHORIZED" }` |
@@ -2448,7 +2452,7 @@ public partial class Program { }
 | Dùng lại Refresh Token đã revoked ngoài Grace Window (> 30s) | Phát hiện tấn công Token Replay Attack -> Thu hồi toàn bộ Refresh Tokens của User |
 | Dùng Access Token sau khi đã gọi Logout | Token đã bị blacklist JTI trong Redis -> 401 Unauthorized |
 | User bị Admin chuyển `Disabled` gọi `/me` hoặc `/logout` | `UpdateUserStatusCommand` xóa ngay cache Redis `user:status:{userId}` -> Chặn ngay lập tức (403 Forbidden) mà không cần chờ TTL 5 phút |
-| Lỗi hệ thống máy chủ (DB connection, 500 Internal Error) | Ghi log `TraceId` và stack trace lên máy chủ; response JSON chỉ trả thông báo chung an toàn, tuyệt đối không leak câu lệnh SQL/cột Postgres |
+| Lỗi hệ thống máy chủ (DB connection, 500 Internal Error) | Ghi log `TraceId` và stack trace lên máy chủ; response JSON chỉ trả thông báo chung an toàn, tuyệt đối không leak câu lệnh SQL/cột MySQL |
 | Đăng ký với StudentId > 50 ký tự hoặc FullName > 200 ký tự | Domain validation ném `ArgumentException`, middleware chuyển thành 400 Bad Request, không bị crash unhandled `DbUpdateException` |
 | Người dùng gửi request logout với token của người khác | `LogoutCommandHandler` kiểm tra `t.UserId == currentUserId` -> Không thể revoke trộm token phiên của tài khoản khác |
 | Rate limit Login (Brute-force) | Giới hạn 5 lần thử/5 phút theo IP (`login-rate-limit`) -> Chặn tấn công dò mật khẩu |

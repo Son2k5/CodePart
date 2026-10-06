@@ -4,3 +4,5 @@ public sealed record RegisterRequest(string FullName, string Email, string Passw
 public sealed record VerifyOtpRequest(string Email, string Otp);
 public sealed record ResendOtpRequest(string Email);
 public sealed record LoginRequest(string Email, string Password);
+public sealed record ForgotPasswordRequest(string Email);
+public sealed record ResetPasswordRequest(string Token, string NewPassword);

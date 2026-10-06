@@ -1,0 +1,108 @@
+services:
+  redis:
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        printf 'user default on >%s ~* &* +@all\n' "$$(cat /run/secrets/redis_password)" > /tmp/users.acl
+        chmod 600 /tmp/users.acl
+        exec redis-server --appendonly yes --aclfile /tmp/users.acl
+    ports: !reset []
+    secrets:
+      - redis_password
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      AllowedHosts: ${SERVER_NAME:?SERVER_NAME must be set}
+      Database__Host: ${DATABASE_HOST:?DATABASE_HOST must be set}
+      Database__Port: ${DATABASE_PORT:-3306}
+      Database__Name: ${DATABASE_NAME:-codepath}
+      Database__User: ${DATABASE_USER:?DATABASE_USER must be set}
+      Redis__Host: redis
+      Jwt__Issuer: ${JWT_ISSUER:-CodePath.Api}
+      Jwt__Audience: ${JWT_AUDIENCE:-CodePath.Client}
+      Cors__AllowedOrigins__0: https://${SERVER_NAME:?SERVER_NAME must be set}
+      AuthFrontend__PublicBaseUrl: https://${SERVER_NAME:?SERVER_NAME must be set}
+      ReverseProxy__KnownNetworks__0: 172.30.0.0/24
+      Email__Smtp__Host: ${SMTP_HOST:?SMTP_HOST must be set}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__Username: ${SMTP_USERNAME:?SMTP_USERNAME must be set}
+      Email__Smtp__FromAddress: ${SMTP_FROM_ADDRESS:?SMTP_FROM_ADDRESS must be set}
+      Email__Smtp__FromName: ${SMTP_FROM_NAME:-CodePath}
+      Email__Smtp__SocketOptions: ${SMTP_SOCKET_OPTIONS:-StartTls}
+      CodeExecution__Judge0__BaseUrl: ${JUDGE0_BASE_URL:?JUDGE0_BASE_URL must be set}
+    secrets:
+      - source: database_password
+        target: Database__Password
+      - source: redis_password
+        target: Redis__Password
+      - source: jwt_signing_key
+        target: Jwt__SigningKey
+      - source: smtp_password
+        target: Email__Smtp__Password
+      - source: admin01_password
+        target: ADMIN01_PASSWORD
+      - source: admin02_password
+        target: ADMIN02_PASSWORD
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    secrets:
+      - tls_certificate
+      - tls_private_key
+    networks:
+      backend:
+        ipv4_address: 172.30.0.10
+    depends_on:
+      - api
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+secrets:
+  database_password:
+    file: ./secrets/database_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  jwt_signing_key:
+    file: ./secrets/jwt_signing_key.txt
+  smtp_password:
+    file: ./secrets/smtp_password.txt
+  admin01_password:
+    file: ./secrets/admin01_password.txt
+  admin02_password:
+    file: ./secrets/admin02_password.txt
+  tls_certificate:
+    file: ./secrets/tls/fullchain.pem
+  tls_private_key:
+    file: ./secrets/tls/privkey.pem

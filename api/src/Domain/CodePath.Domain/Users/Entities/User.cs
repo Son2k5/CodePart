@@ -15,6 +15,7 @@ public sealed class User : BaseEntity
     public string? StudentId { get; private set; }
     public DateTime? EmailVerifiedAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
+    public long SecurityVersion { get; private set; } = 1;
 
     public Guid? ClassId { get; private set; }
     public Class? Class { get; private set; }
@@ -232,6 +233,23 @@ public sealed class User : BaseEntity
         if (string.IsNullOrWhiteSpace(newPasswordHash))
             throw new DomainValidationException("Mật khẩu băm không được để trống.", nameof(newPasswordHash));
         PasswordHash = newPasswordHash;
+        Touch(utcNow);
+    }
+
+    public void UpgradePasswordHash(string newPasswordHash, DateTime utcNow)
+    {
+        if (string.IsNullOrWhiteSpace(newPasswordHash))
+            throw new DomainValidationException("Password hash cannot be empty.", nameof(newPasswordHash));
+
+        EnsureUtc(utcNow);
+        PasswordHash = newPasswordHash;
+        Touch(utcNow);
+    }
+
+    public void IncrementSecurityVersion(DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        SecurityVersion = checked(SecurityVersion + 1);
         Touch(utcNow);
     }
 

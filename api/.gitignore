@@ -6,4 +6,7 @@ obj/
 appsettings.Local.json
 *.db
 .env
+.env.production
 !.env.example
+!.env.production.example
+secrets/

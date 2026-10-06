@@ -20,17 +20,20 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
     private readonly IAuthDbContext _authDbContext;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IUsersDbContext _usersDbContext;
+    private readonly IAuthSessionPolicy _authSessionPolicy;
     private readonly TimeProvider _timeProvider;
 
     public RefreshTokenCommandHandler(
         IAuthDbContext authDbContext,
         IJwtTokenService jwtTokenService,
         IUsersDbContext usersDbContext,
+        IAuthSessionPolicy authSessionPolicy,
         TimeProvider timeProvider)
     {
         _authDbContext = authDbContext;
         _jwtTokenService = jwtTokenService;
         _usersDbContext = usersDbContext;
+        _authSessionPolicy = authSessionPolicy;
         _timeProvider = timeProvider;
     }
 
@@ -65,9 +68,15 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
             return Result<LoginResponse>.Failure("The user is invalid or is not active.", ErrorCodes.Forbidden);
         }
 
-        var newTokens = _jwtTokenService.GenerateTokens(user.Id, user.Email, user.Role, user.Status);
+        var newTokens = _jwtTokenService.GenerateTokens(
+            user.Id, user.Email, user.Role, user.Status, user.SecurityVersion);
         var newTokenHash = _jwtTokenService.HashRefreshToken(newTokens.RefreshToken);
-        var replacement = RefreshToken.CreateReplacement(existingToken, newTokenHash, utcNow, request.IpAddress);
+        var replacement = RefreshToken.CreateReplacement(
+            existingToken,
+            newTokenHash,
+            utcNow,
+            _authSessionPolicy.RefreshTokenLifetime,
+            request.IpAddress);
 
         var rotated = await _authDbContext.TryRotateRefreshTokenAsync(
             tokenHash,
@@ -86,7 +95,8 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
 
         return Result<LoginResponse>.Success(new LoginResponse(
             newTokens.AccessToken,
-            newTokens.ExpiresInSeconds)
+            newTokens.ExpiresInSeconds,
+            AuthenticatedUserResponse.From(user))
         {
             RefreshToken = newTokens.RefreshToken,
             RefreshTokenExpiresAt = replacement.ExpiresAt
@@ -102,4 +112,5 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
             _timeProvider.GetUtcNow().UtcDateTime,
             ipAddress,
             cancellationToken);
+
 }

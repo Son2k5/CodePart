@@ -1,8 +1,9 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, Link } from 'react-router-dom';
-import { forgotPasswordSchema, ForgotPasswordInput } from '../schemas/authSchemas';
+import { Link } from 'react-router-dom';
+import { forgotPasswordSchema } from '../schemas/authSchemas';
+import type { ForgotPasswordInput } from '../schemas/authSchemas';
 import { useForgotPassword } from '../hooks/useAuth';
 import { AuthLayout } from '../components/AuthLayout';
 import { ArrowLeft } from 'lucide-react';
@@ -12,7 +13,6 @@ export const ForgotPasswordPage: React.FC = () => {
     resolver: zodResolver(forgotPasswordSchema),
   });
   const { mutate: forgotPassword, isPending } = useForgotPassword();
-  const navigate = useNavigate();
 
   const onSubmit = (data: ForgotPasswordInput) => {
     forgotPassword(data);
@@ -21,7 +21,7 @@ export const ForgotPasswordPage: React.FC = () => {
   return (
     <AuthLayout 
       title="Reset Password" 
-      subtitle="Enter your email to receive a reset link/OTP"
+      subtitle="Enter your email to receive a reset link"
       backButton={
         <Link to="/login" className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-slate-900">
           <ArrowLeft className="w-4 h-4" /> Back to Login
@@ -53,7 +53,7 @@ export const ForgotPasswordPage: React.FC = () => {
             {isPending ? (
               <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : (
-              <span>Send Reset OTP</span>
+              <span>Send Reset Link</span>
             )}
           </button>
         </div>

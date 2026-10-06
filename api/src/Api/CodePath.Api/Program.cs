@@ -3,8 +3,11 @@ using System.Threading.RateLimiting;
 using CodePath.Api.Authorization;
 using CodePath.Api.Endpoints;
 using CodePath.Api.Extensions;
+using CodePath.Api.Options;
+using CodePath.Api.Middleware;
 using CodePath.Application;
 using CodePath.Application.Auth.Abstractions;
+using CodePath.Application.Users.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using CodePath.Shared.Web.Extensions;
@@ -12,9 +15,12 @@ using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +28,19 @@ if (builder.Environment.IsDevelopment())
 {
     Env.TraversePath().Load();
     builder.Configuration.AddEnvironmentVariables();
+}
+
+// Docker/Kubernetes secrets are mounted as files. Normalize only trailing line
+// endings so secrets created by common CLI tools match the backing services.
+const string secretsDirectory = "/run/secrets";
+if (Directory.Exists(secretsDirectory))
+{
+    var fileSecrets = Directory.EnumerateFiles(secretsDirectory)
+        .ToDictionary(
+            path => Path.GetFileName(path).Replace("__", ":", StringComparison.Ordinal),
+            path => (string?)File.ReadAllText(path).TrimEnd('\r', '\n'),
+            StringComparer.OrdinalIgnoreCase);
+    builder.Configuration.AddInMemoryCollection(fileSecrets);
 }
 
 builder.Services.AddSharedInfrastructure(builder.Configuration);
@@ -38,13 +57,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-        options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            RequireSignedTokens = true,
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
@@ -60,6 +80,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(jti) && await blacklistService.IsBlacklistedAsync(jti))
                 {
                     context.Fail("Token has been revoked.");
+                    return;
+                }
+
+                var subject = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? context.Principal?.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+                var securityVersionClaim = context.Principal?.FindFirst("sv")?.Value;
+                if (!Guid.TryParse(subject, out var userId)
+                    || !long.TryParse(securityVersionClaim, out var tokenSecurityVersion))
+                {
+                    context.Fail("Token session claims are invalid.");
+                    return;
+                }
+
+                var usersDbContext = context.HttpContext.RequestServices.GetRequiredService<IUsersDbContext>();
+                var user = await usersDbContext.GetByIdReadOnlyAsync(userId, context.HttpContext.RequestAborted);
+                if (user is null
+                    || user.Status != UserStatus.Active
+                    || user.SecurityVersion != tokenSecurityVersion)
+                {
+                    context.Fail("Token session has been revoked.");
                 }
             },
             OnChallenge = async context =>
@@ -142,9 +182,54 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddScoped<IAuthorizationHandler, ActiveUserAuthorizationHandler>();
 
+builder.Services.AddOptions<AuthRateLimitingOptions>()
+    .Bind(builder.Configuration.GetSection(AuthRateLimitingOptions.SectionName))
+    .Validate(options => options.BurstCapacity is >= 1 and <= 100000,
+        "Auth rate-limit BurstCapacity must be between 1 and 100000.")
+    .Validate(options => options.RefillPerMinute is >= 1 and <= 100000,
+        "Auth rate-limit RefillPerMinute must be between 1 and 100000.")
+    .Validate(options => options.QueueLimit == 0,
+        "Auth rate-limit QueueLimit must be zero.")
+    .ValidateOnStart();
+
+builder.Services.AddOptions<ReverseProxyTrustOptions>()
+    .Bind(builder.Configuration.GetSection(ReverseProxyTrustOptions.SectionName))
+    .Validate(options => options.ForwardLimit is >= 1 and <= 10,
+        "ReverseProxy:ForwardLimit must be between 1 and 10.")
+    .Validate(options => options.HasValidAddresses(),
+        "ReverseProxy contains an invalid KnownNetworks CIDR or KnownProxies IP address.")
+    .ValidateOnStart();
+
+var reverseProxyTrust = builder.Configuration
+    .GetSection(ReverseProxyTrustOptions.SectionName)
+    .Get<ReverseProxyTrustOptions>() ?? new ReverseProxyTrustOptions();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = reverseProxyTrust.ForwardLimit;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+
+    foreach (var network in reverseProxyTrust.KnownNetworks)
+    {
+        var parts = network.Split('/', StringSplitOptions.TrimEntries);
+        options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(
+            System.Net.IPAddress.Parse(parts[0]),
+            int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture)));
+    }
+
+    foreach (var proxy in reverseProxyTrust.KnownProxies)
+    {
+        options.KnownProxies.Add(System.Net.IPAddress.Parse(proxy));
+    }
+});
+
 var authPermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 30);
-var loginPermitLimit = builder.Configuration.GetValue("RateLimiting:LoginPermitLimit", 30);
 var codeExecutionPermitLimit = builder.Configuration.GetValue("RateLimiting:CodeExecutionPermitLimit", 20);
+var loginRateLimit = builder.Configuration
+    .GetSection(AuthRateLimitingOptions.SectionName)
+    .Get<AuthRateLimitingOptions>() ?? new AuthRateLimitingOptions();
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -153,6 +238,13 @@ builder.Services.AddRateLimiter(options =>
     {
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         context.HttpContext.Response.ContentType = "application/problem+json";
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = Math.Max(
+                1,
+                (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         var problem = new ProblemDetails
         {
@@ -184,10 +276,25 @@ builder.Services.AddRateLimiter(options =>
     {
         var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-        return RateLimitPartition.GetFixedWindowLimiter($"login:{clientIp}", _ => new FixedWindowRateLimiterOptions
+        return RateLimitPartition.GetTokenBucketLimiter($"login:{clientIp}", _ => new TokenBucketRateLimiterOptions
         {
-            PermitLimit = loginPermitLimit,
-            Window = TimeSpan.FromMinutes(5),
+            TokenLimit = loginRateLimit.BurstCapacity,
+            TokensPerPeriod = loginRateLimit.RefillPerMinute,
+            ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+            AutoReplenishment = true,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = loginRateLimit.QueueLimit
+        });
+    });
+
+    options.AddPolicy("password-reset-rate-limit", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter($"password-reset:{clientIp}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(15),
             QueueLimit = 0
         });
     });
@@ -199,6 +306,18 @@ builder.Services.AddRateLimiter(options =>
         return RateLimitPartition.GetFixedWindowLimiter($"health:{clientIp}", _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy("public-read-rate-limit", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter($"public-read:{clientIp}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         });
@@ -228,55 +347,26 @@ var app = builder.Build();
 // Domain owns constraints qua IEntityTypeConfiguration, Api orchestrate MigrateAsync().
 await app.MigrateDatabasesAsync();
 
-var forwardedHeadersOptions = new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-};
-
-var proxyNetworks = builder.Configuration.GetSection("ReverseProxy:KnownNetworks").Get<string[]>()
-    ?? (builder.Configuration["ReverseProxy:KnownNetwork"] is not null
-        ? new[] { builder.Configuration["ReverseProxy:KnownNetwork"]! }
-        : Array.Empty<string>());
-
-if (proxyNetworks.Length > 0)
-{
-    var trustedNetworks = new List<Microsoft.AspNetCore.HttpOverrides.IPNetwork>();
-
-    foreach (var network in proxyNetworks)
-    {
-        var subnetParts = network.Split('/');
-        if (subnetParts.Length != 2
-            || !System.Net.IPAddress.TryParse(subnetParts[0], out var ip)
-            || !int.TryParse(subnetParts[1], out var prefix))
-        {
-            throw new InvalidOperationException($"Reverse proxy network '{network}' is not a valid CIDR value.");
-        }
-
-        try
-        {
-            trustedNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
-        }
-        catch (ArgumentOutOfRangeException ex)
-        {
-            throw new InvalidOperationException($"Reverse proxy network '{network}' has an invalid prefix length.", ex);
-        }
-    }
-
-    forwardedHeadersOptions.KnownNetworks.Clear();
-    forwardedHeadersOptions.KnownProxies.Clear();
-
-    foreach (var trustedNetwork in trustedNetworks)
-    {
-        forwardedHeadersOptions.KnownNetworks.Add(trustedNetwork);
-    }
-}
-
-app.UseForwardedHeaders(forwardedHeadersOptions);
+app.UseForwardedHeaders();
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 // CORS đặt trước AppExceptionHandling để mọi response lỗi 4xx/5xx vẫn luôn có CORS headers
 app.UseCors();
 
 app.UseAppExceptionHandling();
+
+app.Use(async (httpContext, next) =>
+{
+    if (httpContext.Request.Path.StartsWithSegments("/api/auth"))
+    {
+        httpContext.Response.Headers.CacheControl = "no-store";
+        httpContext.Response.Headers.Pragma = "no-cache";
+        httpContext.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        httpContext.Response.Headers["Referrer-Policy"] = "no-referrer";
+    }
+
+    await next();
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -297,8 +387,32 @@ app.UseAuthorization();
 app.MapGet("/", () => Results.Ok(new { service = "CodePath API", status = "healthy" }))
    .ExcludeFromDescription();
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
-   .ExcludeFromDescription();
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString().ToLowerInvariant(),
+            checks = report.Entries.ToDictionary(
+                entry => entry.Key,
+                entry => new
+                {
+                    status = entry.Value.Status.ToString().ToLowerInvariant(),
+                    durationMs = entry.Value.Duration.TotalMilliseconds
+                })
+        });
+    }
+})
+.RequireRateLimiting("health-rate-limit");
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+})
+.ExcludeFromDescription();
 
 app.MapGet("/health/redis", async (IRedisHealthProbe probe, IWebHostEnvironment env, CancellationToken ct) =>
 {

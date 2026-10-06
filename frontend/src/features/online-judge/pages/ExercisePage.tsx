@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-// @ts-ignore
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -61,7 +60,7 @@ export const ExercisePage = () => {
     setSubmitResult(null);
     setActiveTab('result');
     try {
-      const result = await judgeApi.runCode(exercise.id, language.id, code, customInput);
+      const result = await judgeApi.runCode(exercise.id, language.value, code, customInput);
       setRunResult(result);
     } catch (err: any) {
       setError(err.message);
@@ -77,7 +76,7 @@ export const ExercisePage = () => {
     setSubmitResult(null);
     setActiveTab('result');
     try {
-      const result = await judgeApi.submitCode(exercise.id, language.id, code);
+      const result = await judgeApi.submitCode(exercise.id, language.value, code);
       setSubmitResult(result);
     } catch (err: any) {
       setError(err.message);
@@ -135,9 +134,9 @@ export const ExercisePage = () => {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        <PanelGroup direction="horizontal">
+        <Group orientation="horizontal">
           {/* Left Panel - Description */}
-          <Panel defaultSize={40} minSize={20} className="bg-gray-900 flex flex-col border-r border-gray-800">
+          <Panel defaultSize="40" minSize="20" className="bg-gray-900 flex flex-col border-r border-gray-800">
             <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
               <h1 className="text-2xl font-bold text-white mb-6">{exercise.title}</h1>
               <div 
@@ -147,13 +146,13 @@ export const ExercisePage = () => {
             </div>
           </Panel>
 
-          <PanelResizeHandle className="w-1.5 bg-gray-800 hover:bg-blue-500/50 transition-colors cursor-col-resize active:bg-blue-500" />
+          <Separator className="w-1.5 bg-gray-800 hover:bg-blue-500/50 transition-colors cursor-col-resize active:bg-blue-500" />
 
           {/* Right Panel - Editor & Console */}
-          <Panel defaultSize={60}>
-            <PanelGroup direction="vertical">
+          <Panel defaultSize="60">
+            <Group orientation="vertical">
               {/* Top - Editor */}
-              <Panel defaultSize={70} className="flex flex-col bg-[#1e1e1e]">
+              <Panel defaultSize="70" className="flex flex-col bg-[#1e1e1e]">
                 <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#1e1e1e]">
                   <select 
                     value={language.id} 
@@ -185,10 +184,10 @@ export const ExercisePage = () => {
                 </div>
               </Panel>
 
-              <PanelResizeHandle className="h-1.5 bg-gray-800 hover:bg-blue-500/50 transition-colors cursor-row-resize active:bg-blue-500" />
+              <Separator className="h-1.5 bg-gray-800 hover:bg-blue-500/50 transition-colors cursor-row-resize active:bg-blue-500" />
 
               {/* Bottom - Console */}
-              <Panel defaultSize={30} className="bg-[#1e1e1e] flex flex-col">
+              <Panel defaultSize="30" className="bg-[#1e1e1e] flex flex-col">
                 <div className="flex items-center gap-6 px-4 py-2 bg-[#2d2d2d] border-b border-[#1e1e1e]">
                   <button 
                     onClick={() => setActiveTab('testcases')}
@@ -314,9 +313,9 @@ export const ExercisePage = () => {
                   )}
                 </div>
               </Panel>
-            </PanelGroup>
+            </Group>
           </Panel>
-        </PanelGroup>
+        </Group>
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `

@@ -21,20 +21,20 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 
         builder.Property(log => log.OccurredAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(log => log.IpAddress)
             .HasMaxLength(45);
 
         builder.Property(log => log.DataJson)
             .IsRequired()
-            .HasColumnType("jsonb");
+            .HasColumnType("json");
 
         builder.Property(log => log.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
         builder.Property(log => log.CreatedBy).HasMaxLength(100);
-        builder.Property(log => log.UpdatedAt).HasColumnType("timestamptz");
+        builder.Property(log => log.UpdatedAt).HasColumnType("datetime(6)");
         builder.Property(log => log.UpdatedBy).HasMaxLength(100);
 
         builder.HasIndex(log => new { log.OccurredAt, log.Id })

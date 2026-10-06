@@ -1,4 +1,4 @@
-import { authenticatedFetch } from '../../../lib/apiClient';
+import { axiosInstance } from '../../../lib/axios';
 
 export interface TestCase {
   id: string;
@@ -39,37 +39,32 @@ export interface SubmitResult {
 
 export const judgeApi = {
   getExerciseBySlug: async (slug: string): Promise<Exercise> => {
-    const response = await fetch(`/api/exercises/${slug}`);
-    if (!response.ok) throw new Error('Failed to fetch exercise');
-    return response.json();
+    const response = await axiosInstance.get<Exercise>(`/exercises/${slug}`);
+    return response.data;
   },
 
   runCode: async (
     exerciseId: string,
-    languageId: number,
+    language: string,
     sourceCode: string,
     customInput?: string
   ): Promise<RunResult> => {
-    const response = await authenticatedFetch(`/api/exercises/${exerciseId}/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ languageId, sourceCode, customInput }),
-    });
-    if (!response.ok) throw new Error('Failed to run code');
-    return response.json();
+    const response = await axiosInstance.post<RunResult>(
+      `/exercises/${exerciseId}/run`,
+      { language, sourceCode, customInput },
+    );
+    return response.data;
   },
 
   submitCode: async (
     exerciseId: string,
-    languageId: number,
+    language: string,
     sourceCode: string
   ): Promise<SubmitResult> => {
-    const response = await authenticatedFetch(`/api/exercises/${exerciseId}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ languageId, sourceCode }),
-    });
-    if (!response.ok) throw new Error('Failed to submit code');
-    return response.json();
+    const response = await axiosInstance.post<SubmitResult>(
+      `/exercises/${exerciseId}/submit`,
+      { language, sourceCode },
+    );
+    return response.data;
   },
 };

@@ -32,13 +32,13 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
         // Audit Fields (BaseEntity)
         builder.Property(c => c.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(c => c.CreatedBy)
             .HasMaxLength(100);
 
         builder.Property(c => c.UpdatedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(c => c.UpdatedBy)
             .HasMaxLength(100);

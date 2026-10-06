@@ -8,6 +8,7 @@ public static class ErrorCodes
     public const string NotFound = "NOT_FOUND";
     public const string Conflict = "CONFLICT";
     public const string ValidationError = "VALIDATION_ERROR";
+    public const string AccountUnverified = "UNVERIFIED_EMAIL";
     public const string AccountPending = "ACCOUNT_PENDING";
     public const string AccountRejected = "ACCOUNT_REJECTED";
     public const string AccountDisabled = "ACCOUNT_DISABLED";

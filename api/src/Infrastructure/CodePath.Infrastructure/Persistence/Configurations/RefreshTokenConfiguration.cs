@@ -26,38 +26,42 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
 
         builder.Property(r => r.TokenHash)
             .IsRequired()
-            .HasMaxLength(128);
+            .HasMaxLength(128)
+            .HasCharSet("ascii")
+            .UseCollation("ascii_bin");
 
         builder.Property(r => r.ExpiresAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(r => r.AbsoluteExpiresAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(r => r.CreatedByIp)
             .HasMaxLength(64);
 
         builder.Property(r => r.RevokedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(r => r.RevokedByIp)
             .HasMaxLength(64);
 
         builder.Property(r => r.ReplacedByTokenHash)
-            .HasMaxLength(128);
+            .HasMaxLength(128)
+            .HasCharSet("ascii")
+            .UseCollation("ascii_bin");
 
         // Audit Fields (BaseEntity)
         builder.Property(r => r.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(r => r.CreatedBy)
             .HasMaxLength(100);
 
         builder.Property(r => r.UpdatedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(r => r.UpdatedBy)
             .HasMaxLength(100);
@@ -73,8 +77,7 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.HasIndex(r => r.FamilyId)
             .HasDatabaseName("ix_refresh_tokens_family");
 
-        builder.HasIndex(r => new { r.UserId, r.FamilyId })
-            .HasFilter("\"RevokedAt\" IS NULL")
+        builder.HasIndex(r => new { r.UserId, r.FamilyId, r.RevokedAt })
             .HasDatabaseName("ix_refresh_tokens_active");
 
         // Relationship & Cascade Constraint with User

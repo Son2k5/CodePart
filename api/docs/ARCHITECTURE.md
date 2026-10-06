@@ -11,10 +11,10 @@ src/
   Shared/
     CodePath.Shared.Kernel      # BaseEntity, Result, Events, Exceptions
     CodePath.Shared.Web         # Web helpers: Swagger, ExceptionHandling, Redis
-  Tools/
-    CodePath.Migrator           # Tool chạy Database Migrations độc lập
 tests/
   CodePath.Architecture.Tests   # Kiểm tra quy ước kiến trúc
+  CodePath.Unit.Tests           # Unit tests
+  CodePath.Integration.Tests    # Integration tests với MySQL 8.4 và Redis
 ```
 
 ## 2. Quy ước phụ thuộc (Clean Architecture)
@@ -35,7 +35,7 @@ tests/
 
 ## 4. Dữ liệu & Persistence
 
-- Các DbContext tách schema rõ ràng (`auth`, `users`).
-- Entity configurations được phân lập theo namespace để tránh cross-schema configuration.
+- Một `AppDbContext` dùng chung cho các feature trong kiến trúc layer thuần; đây không phải Modular Monolith.
+- MySQL dùng một database `codepath`; không dùng EF schema kiểu PostgreSQL.
 - `IDbContext` abstractions (`IAuthDbContext`, `IUsersDbContext`) đặt tại `Application/{Feature}/Abstractions`.
-- `DbContext` implementations đặt tại `Infrastructure/{Feature}/Persistence`.
+- `AppDbContext` và các entity configuration đặt tại `Infrastructure/Persistence`.

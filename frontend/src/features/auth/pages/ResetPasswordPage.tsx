@@ -1,56 +1,76 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { resetPasswordSchema, ResetPasswordInput } from '../schemas/authSchemas';
+import { Link } from 'react-router-dom';
+import { resetPasswordSchema } from '../schemas/authSchemas';
+import type { ResetPasswordInput } from '../schemas/authSchemas';
 import { useResetPassword } from '../hooks/useAuth';
 import { AuthLayout } from '../components/AuthLayout';
 import { PasswordInput } from '../components/PasswordInput';
-import { OtpInput } from '../components/OtpInput';
+
+function extractTokenFromLocation(): string {
+  // Backend sends link as /reset-password#token=<64hex> (see EmailSender).
+  // Token is in URL fragment so it never hits the server on link open.
+  const hash = window.location.hash || '';
+  const hashMatch = hash.match(/token=([A-Fa-f0-9]{64})/);
+  if (hashMatch) return hashMatch[1];
+  const params = new URLSearchParams(window.location.search);
+  return params.get('token') ?? '';
+}
 
 export const ResetPasswordPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const email = searchParams.get('email');
-  const navigate = useNavigate();
+  const token = extractTokenFromLocation();
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<ResetPasswordInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { email: email || '', otp: '' }
+    defaultValues: { token, newPassword: '', confirmPassword: '' }
   });
-  
+
   const { mutate: resetPassword, isPending } = useResetPassword();
 
-  useEffect(() => {
-    if (!email) {
-      navigate('/forgot-password');
-    }
-  }, [email, navigate]);
-
   const onSubmit = (data: ResetPasswordInput) => {
-    const { confirmPassword, ...payload } = data;
-    resetPassword(payload);
+    const { confirmPassword, ...rest } = data;
+    void confirmPassword;
+    resetPassword({ token: rest.token, newPassword: rest.newPassword });
   };
 
-  if (!email) return null;
+  if (!token) {
+    return (
+      <AuthLayout
+        title="Invalid Reset Link"
+        subtitle="Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."
+      >
+        <div className="space-y-6 mt-4 text-center">
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Vui lòng mở lại liên kết trong email (dạng <span className="font-mono">/reset-password#token=...</span>),
+            hoặc yêu cầu gửi lại email đặt lại mật khẩu.
+          </p>
+          <div className="pt-4 flex flex-col gap-3">
+            <Link
+              to="/forgot-password"
+              className="w-full flex items-center justify-center py-3.5 px-4 bg-[#1a1a1a] hover:bg-black text-white font-semibold text-sm rounded-full shadow-md transition-all duration-200"
+            >
+              Request New Link
+            </Link>
+            <Link to="/login" className="text-[13px] font-medium text-gray-500 hover:text-slate-900">
+              Back to Login
+            </Link>
+          </div>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
-    <AuthLayout 
-      title="Create New Password" 
-      subtitle={`Enter the OTP sent to ${email} and your new password.`}
+    <AuthLayout
+      title="Create New Password"
+      subtitle="Enter your new password below."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
-        
-        <div className="space-y-2">
-          <label className="block text-center text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-            6-Digit OTP
-          </label>
-          <OtpInput 
-            value={watch('otp')} 
-            onChange={(val) => setValue('otp', val, { shouldValidate: true })} 
-            length={6} 
-            error={errors.otp?.message}
-          />
-        </div>
+        <input type="hidden" {...register('token')} />
+        {errors.token && (
+          <p className="text-xs text-red-500 text-center" role="alert">{errors.token.message}</p>
+        )}
 
         <PasswordInput
           label="New Password"

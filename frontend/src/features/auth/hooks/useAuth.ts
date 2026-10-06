@@ -6,7 +6,7 @@ import { AUTH_MESSAGES } from '../../../constants/messages';
 import { toast } from 'sonner';
 
 const getErrorMessage = (error: any) => {
-  return error.response?.data?.message || error.message || 'Đã có lỗi xảy ra';
+  return error.response?.data?.detail || error.response?.data?.message || error.message || 'Đã có lỗi xảy ra';
 };
 
 export const useLogin = () => {
@@ -27,12 +27,13 @@ export const useLogin = () => {
         navigate('/courses');
       }
     },
-    onError: (error: any) => {
-      // Handle specific errors like Not Verified, Pending, etc.
+    onError: (error: any, variables) => {
       const code = error.response?.data?.code;
       if (code === 'UNVERIFIED_EMAIL') {
-        toast.error('Email chưa xác thực. Chuyển hướng...');
-        // need email state passed, let's assume login returns the email in error or we can get it from mutation args
+        toast.error('Email chưa xác thực. Vui lòng nhập mã OTP.');
+        navigate(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
+      } else if (code === 'ACCOUNT_PENDING') {
+        navigate('/pending-approval');
       } else {
         toast.error(getErrorMessage(error));
       }
@@ -58,9 +59,9 @@ export const useRegisterTeacher = () => {
   const navigate = useNavigate();
   return useMutation({
     mutationFn: authApi.registerTeacher,
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success(AUTH_MESSAGES.REGISTER_SUCCESS);
-      navigate('/pending-approval');
+      navigate(`/verify-otp?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));
@@ -72,9 +73,10 @@ export const useVerifyOtp = () => {
   const navigate = useNavigate();
   return useMutation({
     mutationFn: authApi.verifyOtp,
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success(AUTH_MESSAGES.OTP_VERIFIED);
-      navigate('/login');
+      const isStudent = /^\d+@hanu\.edu\.vn$/i.test(variables.email);
+      navigate(isStudent ? '/login' : '/pending-approval');
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));
@@ -99,12 +101,12 @@ export const useResendOtp = () => {
 };
 
 export const useForgotPassword = () => {
-  const navigate = useNavigate();
   return useMutation({
     mutationFn: authApi.forgotPassword,
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
+      // Backend sends reset link via email (/reset-password#token=...).
+      // Do not navigate to /reset-password directly (token comes from email).
       toast.success(AUTH_MESSAGES.OTP_SENT);
-      navigate(`/reset-password?email=${encodeURIComponent(variables.email)}`);
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));

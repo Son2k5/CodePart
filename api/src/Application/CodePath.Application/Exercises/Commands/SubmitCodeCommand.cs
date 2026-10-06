@@ -30,6 +30,9 @@ internal sealed class SubmitCodeCommandHandler(
     ICodeExecutionService runner,
     TimeProvider timeProvider) : IRequestHandler<SubmitCodeCommand, Result<ExecutionResultDto>>
 {
+    private const int MaximumTestCasesPerSubmission = 50;
+    private const int MaximumStoredOutputLength = 16_384;
+
     public async Task<Result<ExecutionResultDto>> Handle(SubmitCodeCommand request, CancellationToken cancellationToken)
     {
         if (!runner.Supports(request.Language))
@@ -38,6 +41,9 @@ internal sealed class SubmitCodeCommandHandler(
         var exercise = await dbContext.GetPublishedByIdAsync(request.ExerciseId, cancellationToken);
         if (exercise is null)
             return Result<ExecutionResultDto>.Failure("Exercise was not found.", ErrorCodes.NotFound);
+
+        if (exercise.TestCases.Count > MaximumTestCasesPerSubmission)
+            return Result<ExecutionResultDto>.Failure("The exercise has too many test cases to execute safely.");
 
         var utcNow = timeProvider.GetUtcNow().UtcDateTime;
         var submission = Submission.Create(exercise.Id, request.StudentId, request.Language, request.SourceCode, utcNow);
@@ -50,16 +56,23 @@ internal sealed class SubmitCodeCommandHandler(
                 request.Language, request.SourceCode, test.Input, test.ExpectedOutput,
                 exercise.TimeLimitMs, exercise.MemoryLimitKb, cancellationToken);
 
+            var safeOutput = Truncate(outcome.StandardOutput);
+            var safeError = Truncate(outcome.ErrorMessage);
+
             domainResults.Add(SubmissionTestResult.Create(
-                submission.Id, test.Id, outcome.Status, outcome.StandardOutput, outcome.ErrorMessage,
+                submission.Id, test.Id, outcome.Status, safeOutput, safeError,
                 outcome.RuntimeMs, outcome.MemoryKb, utcNow));
+
+            var clientError = test.IsSample || outcome.Status == SubmissionStatus.CompilationError
+                ? safeError
+                : null;
 
             responseResults.Add(new TestCaseResultDto(
                 test.Id, test.Order, outcome.Status.ToString(),
                 test.IsSample ? test.Input : null,
                 test.IsSample ? test.ExpectedOutput : null,
-                test.IsSample ? outcome.StandardOutput : null,
-                outcome.ErrorMessage,
+                test.IsSample ? safeOutput : null,
+                clientError,
                 outcome.RuntimeMs,
                 outcome.MemoryKb));
 
@@ -86,4 +99,9 @@ internal sealed class SubmitCodeCommandHandler(
             memory,
             responseResults));
     }
+
+    private static string? Truncate(string? value) =>
+        value is null || value.Length <= MaximumStoredOutputLength
+            ? value
+            : value[..MaximumStoredOutputLength];
 }

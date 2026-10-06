@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
-import { registerStudentSchema, registerTeacherSchema, RegisterStudentInput, RegisterTeacherInput } from '../schemas/authSchemas';
+import { registerStudentSchema, registerTeacherSchema } from '../schemas/authSchemas';
+import type { RegisterStudentInput, RegisterTeacherInput } from '../schemas/authSchemas';
 import { useRegisterStudent, useRegisterTeacher } from '../hooks/useAuth';
 import { AuthLayout } from '../components/AuthLayout';
 import { PasswordInput } from '../components/PasswordInput';
@@ -24,13 +25,11 @@ export const RegisterPage: React.FC = () => {
   const isPending = isPendingStudent || isPendingTeacher;
 
   const onStudentSubmit = (data: RegisterStudentInput) => {
-    const { confirmPassword, ...payload } = data;
-    registerStudent(payload);
+    registerStudent({ fullName: data.fullName, email: data.email, password: data.password });
   };
 
   const onTeacherSubmit = (data: RegisterTeacherInput) => {
-    const { confirmPassword, ...payload } = data;
-    registerTeacher(payload);
+    registerTeacher({ fullName: data.fullName, email: data.email, password: data.password });
   };
 
   const registerProps = role === 'student' ? registerStudentForm : registerTeacherForm;

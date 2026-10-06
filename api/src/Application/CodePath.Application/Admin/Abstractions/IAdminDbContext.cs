@@ -6,7 +6,9 @@ namespace CodePath.Application.Admin.Abstractions;
 
 public interface IAdminDbContext
 {
-    Task<IAdminTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task<TResult> ExecuteInTransactionAsync<TResult>(
+        Func<CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<User>> GetTeachersAsync(
         UserStatus? status,
@@ -23,9 +25,4 @@ public interface IAdminDbContext
         CancellationToken cancellationToken = default);
 
     Task AddAuditLogAsync(AuditLog auditLog, CancellationToken cancellationToken = default);
-}
-
-public interface IAdminTransaction : IAsyncDisposable
-{
-    Task CommitAsync(CancellationToken cancellationToken = default);
 }

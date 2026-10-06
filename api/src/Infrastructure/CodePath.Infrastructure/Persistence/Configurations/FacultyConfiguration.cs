@@ -26,13 +26,13 @@ public sealed class FacultyConfiguration : IEntityTypeConfiguration<Faculty>
         // Audit Fields (BaseEntity)
         builder.Property(f => f.CreatedAt)
             .IsRequired()
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(f => f.CreatedBy)
             .HasMaxLength(100);
 
         builder.Property(f => f.UpdatedAt)
-            .HasColumnType("timestamptz");
+            .HasColumnType("datetime(6)");
 
         builder.Property(f => f.UpdatedBy)
             .HasMaxLength(100);

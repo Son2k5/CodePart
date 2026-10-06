@@ -2,13 +2,13 @@
 
 ## Auth API client
 
-`src/lib/apiClient.ts` keeps the access token in memory and sends the refresh
-token only through the HttpOnly cookie. Its `authenticatedFetch` helper retries
-one 401 response after a single-flight refresh, so concurrent 401 responses
-share one `/api/auth/refresh` request.
+`src/lib/axios.ts` is the single HTTP client for authentication and protected
+API calls. It keeps the access token in memory, sends the refresh token only
+through the HttpOnly cookie, and queues concurrent 401 responses behind one
+refresh request.
 
 Set `VITE_API_BASE_URL` when the API is not served from the same origin. All auth
-requests use `credentials: 'include'`.
+requests use `withCredentials: true`.
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

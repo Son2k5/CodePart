@@ -18,7 +18,7 @@ Frontend / API client
        |
        | Run / Submit + JWT
        v
-ASP.NET Core API -- đọc test case --> PostgreSQL
+ASP.NET Core API -- đọc test case --> MySQL
        |
        | source + stdin + resource limits
        v
@@ -26,12 +26,12 @@ Judge0 (mạng/container riêng)
        |
        | status + stdout + runtime + memory
        v
-ASP.NET Core API -- lưu khi Submit --> PostgreSQL
+ASP.NET Core API -- lưu khi Submit --> MySQL
 ```
 
 ## Cấu hình local
 
-1. Chạy PostgreSQL và Redis như cấu hình hiện tại của dự án.
+1. Chạy MySQL 8.4 và Redis như cấu hình hiện tại của dự án.
 2. Triển khai Judge0 ở một service/container riêng theo hướng dẫn self-host của Judge0. Không đặt Judge0 public trên Internet.
 3. Thêm cấu hình vào `.env`:
 
