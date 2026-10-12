@@ -16,6 +16,13 @@ const DashboardRedirect = () => {
 
 const router = createBrowserRouter([
   {
+    path: '/',
+    lazy: async () => {
+      const { LandingPage } = await import('./pages/LandingPage');
+      return { Component: LandingPage };
+    },
+  },
+  {
     element: <GuestRoute />,
     children: [
       {
@@ -72,7 +79,7 @@ const router = createBrowserRouter([
           },
         ],
       },
-      { path: '/', element: <DashboardRedirect /> },
+      { path: '/dashboard', element: <DashboardRedirect /> },
     ],
   },
 ]);

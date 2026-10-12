@@ -1,126 +1,41 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
+import { ArrowRight, GraduationCap, Presentation } from 'lucide-react';
 import { registerStudentSchema, registerTeacherSchema } from '../schemas/authSchemas';
 import type { RegisterStudentInput, RegisterTeacherInput } from '../schemas/authSchemas';
 import { useRegisterStudent, useRegisterTeacher } from '../hooks/useAuth';
-import { AuthLayout } from '../components/AuthLayout';
-import { PasswordInput } from '../components/PasswordInput';
+import { BrightAuthLayout } from '../components/BrightAuthLayout';
+import { AuthField } from '../components/AuthField';
 
-export const RegisterPage: React.FC = () => {
+export const RegisterPage = () => {
   const [role, setRole] = useState<'student' | 'teacher'>('student');
-  
-  const { register: registerStudentForm, handleSubmit: handleSubmitStudent, formState: { errors: errorsStudent } } = useForm<RegisterStudentInput>({
-    resolver: zodResolver(registerStudentSchema),
-  });
-  
-  const { register: registerTeacherForm, handleSubmit: handleSubmitTeacher, formState: { errors: errorsTeacher } } = useForm<RegisterTeacherInput>({
-    resolver: zodResolver(registerTeacherSchema),
-  });
-
+  const studentForm = useForm<RegisterStudentInput>({ resolver: zodResolver(registerStudentSchema) });
+  const teacherForm = useForm<RegisterTeacherInput>({ resolver: zodResolver(registerTeacherSchema) });
   const { mutate: registerStudent, isPending: isPendingStudent } = useRegisterStudent();
   const { mutate: registerTeacher, isPending: isPendingTeacher } = useRegisterTeacher();
-
   const isPending = isPendingStudent || isPendingTeacher;
-
-  const onStudentSubmit = (data: RegisterStudentInput) => {
-    registerStudent({ fullName: data.fullName, email: data.email, password: data.password });
-  };
-
-  const onTeacherSubmit = (data: RegisterTeacherInput) => {
-    registerTeacher({ fullName: data.fullName, email: data.email, password: data.password });
-  };
-
-  const registerProps = role === 'student' ? registerStudentForm : registerTeacherForm;
-  const errors = role === 'student' ? errorsStudent : errorsTeacher;
-  const onSubmit = role === 'student' ? handleSubmitStudent(onStudentSubmit) : handleSubmitTeacher(onTeacherSubmit);
+  const form = role === 'student' ? studentForm : teacherForm;
+  const { errors } = form.formState;
+  const onSubmit = form.handleSubmit(({ fullName, email, password }) => {
+    (role === 'student' ? registerStudent : registerTeacher)({ fullName, email, password });
+  });
 
   return (
-    <AuthLayout title="Create Account" subtitle="Sign up to get started with CodePath">
-      <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
-        <button
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${role === 'student' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-          onClick={() => setRole('student')}
-        >
-          Student
-        </button>
-        <button
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${role === 'teacher' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-          onClick={() => setRole('teacher')}
-        >
-          Teacher
-        </button>
+    <BrightAuthLayout variant="register" title="Tạo tài khoản mới" subtitle="Chọn vai trò của bạn và bắt đầu cùng CodePart.">
+      <div className="auth-roles" role="group" aria-label="Vai trò tài khoản">
+        <button type="button" className="auth-role" disabled={isPending} aria-pressed={role === 'student'} onClick={() => setRole('student')}><GraduationCap size={17} /> Sinh viên</button>
+        <button type="button" className="auth-role" disabled={isPending} aria-pressed={role === 'teacher'} onClick={() => setRole('teacher')}><Presentation size={17} /> Giảng viên</button>
       </div>
-
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-1">
-          <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-            Full Name
-          </label>
-          <input
-            {...registerProps('fullName')}
-            type="text"
-            placeholder="Nguyen Van A"
-            className={`w-full border-b py-2 text-sm text-slate-900 placeholder-gray-300 focus:outline-none bg-transparent font-medium transition-colors ${
-              errors.fullName ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-slate-900'
-            }`}
-          />
-          {errors.fullName && <p className="text-xs text-red-500 mt-1">{errors.fullName.message as string}</p>}
-        </div>
-
-        <div className="space-y-1">
-          <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-            Email
-          </label>
-          <input
-            {...registerProps('email')}
-            type="email"
-            placeholder={role === 'student' ? '123456@hanu.edu.vn' : 'teacher@hanu.edu.vn'}
-            className={`w-full border-b py-2 text-sm text-slate-900 placeholder-gray-300 focus:outline-none bg-transparent font-medium transition-colors ${
-              errors.email ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-slate-900'
-            }`}
-          />
-          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message as string}</p>}
-        </div>
-
-        <PasswordInput
-          label="Password"
-          placeholder="••••••••"
-          {...registerProps('password')}
-          error={errors.password?.message as string}
-        />
-
-        <PasswordInput
-          label="Confirm Password"
-          placeholder="••••••••"
-          {...registerProps('confirmPassword')}
-          error={errors.confirmPassword?.message as string}
-        />
-
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full flex items-center justify-center py-3.5 px-4 bg-[#1a1a1a] hover:bg-black disabled:bg-gray-400 text-white font-semibold text-sm rounded-full shadow-md transition-all duration-200"
-          >
-            {isPending ? (
-              <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-            ) : (
-              <span>Sign up</span>
-            )}
-          </button>
-        </div>
+      <form key={role} onSubmit={onSubmit} className="auth-form" noValidate aria-busy={isPending}>
+        <AuthField label="Họ và tên" autoComplete="name" placeholder="Nguyễn Văn An" {...form.register('fullName')} error={errors.fullName?.message} />
+        <AuthField label="Email trường" type="email" autoComplete="email" placeholder={role === 'student' ? '123456@hanu.edu.vn' : 'giangvien@hanu.edu.vn'} hint={role === 'student' ? 'Sử dụng email theo mã sinh viên, ví dụ: 123456@hanu.edu.vn.' : 'Sử dụng email giảng viên @hanu.edu.vn. Tài khoản cần được phê duyệt sau khi xác thực.'} {...form.register('email')} error={errors.email?.message} />
+        <AuthField label="Mật khẩu" type="password" autoComplete="new-password" placeholder="Tạo mật khẩu của bạn" hint="Ít nhất 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt." {...form.register('password')} error={errors.password?.message} />
+        <AuthField label="Xác nhận mật khẩu" type="password" autoComplete="new-password" placeholder="Nhập lại mật khẩu" {...form.register('confirmPassword')} error={errors.confirmPassword?.message} />
+        <button type="submit" disabled={isPending} className="auth-submit">{isPending ? 'Đang tạo tài khoản…' : <>Tạo tài khoản <ArrowRight size={17} /></>}</button>
       </form>
-
-      <div className="mt-8 text-center text-[13px] font-medium text-gray-500">
-        <p>
-          Already have an account?{' '}
-          <Link to="/login" className="text-slate-900 font-bold hover:underline">
-            Log in
-          </Link>
-        </p>
-      </div>
-    </AuthLayout>
+      <p className="auth-switch">Đã có tài khoản? <Link to="/login" className="auth-link">Đăng nhập</Link></p>
+    </BrightAuthLayout>
   );
 };

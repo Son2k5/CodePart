@@ -241,7 +241,7 @@ export const InteractiveCodeDemo: React.FC = () => {
                 ) : (
                   <div className="py-8 text-center text-slate-500 text-xs">
                     <p className="mb-2">Nhấn nút "Chạy thử nộp bài" phía trên</p>
-                    <p className="text-slate-400">để mô phỏng hệ thống chấm bài trực tiếp của CodePath.</p>
+                    <p className="text-slate-400">để mô phỏng hệ thống chấm bài trực tiếp của CodePart.</p>
                   </div>
                 )}
               </div>

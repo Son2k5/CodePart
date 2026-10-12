@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+@theme { --font-sans: 'Inter', sans-serif; }
+@layer base {
+  body { margin: 0; font-family: var(--font-sans); }
+  button, input, textarea, select { font: inherit; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid #397c8c; outline-offset: 5px; }
+  html { scroll-behavior: smooth; }
+  section[id] { scroll-margin-top: 24px; }
+}
+@layer utilities {
+  .font-poppins, .font-nunito { font-family: var(--font-sans); }
+}

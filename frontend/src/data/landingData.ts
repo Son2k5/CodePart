@@ -4,7 +4,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   { id: 'home', label: 'Trang chủ', href: '#home' },
   { id: 'courses', label: 'Lớp thực hành', href: '#courses' },
   { id: 'workflow', label: 'Quy trình học', href: '#workflow' },
-  { id: 'demo', label: 'Trải nghiệm', href: '#interactive-demo' },
+  { id: 'system-features', label: 'Tính năng hệ thống', href: '#system-features' },
   { id: 'testimonials', label: 'Đánh giá', href: '#testimonials' },
   { id: 'contact', label: 'Liên hệ', href: '#contact' },
 ]

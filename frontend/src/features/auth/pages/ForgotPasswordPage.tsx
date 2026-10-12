@@ -1,63 +1,24 @@
-import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
+import { ArrowLeft, Mail } from 'lucide-react';
 import { forgotPasswordSchema } from '../schemas/authSchemas';
 import type { ForgotPasswordInput } from '../schemas/authSchemas';
 import { useForgotPassword } from '../hooks/useAuth';
-import { AuthLayout } from '../components/AuthLayout';
-import { ArrowLeft } from 'lucide-react';
+import { BrightAuthLayout } from '../components/BrightAuthLayout';
+import { AuthField } from '../components/AuthField';
 
-export const ForgotPasswordPage: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordInput>({
-    resolver: zodResolver(forgotPasswordSchema),
-  });
-  const { mutate: forgotPassword, isPending } = useForgotPassword();
-
-  const onSubmit = (data: ForgotPasswordInput) => {
-    forgotPassword(data);
-  };
-
+export const ForgotPasswordPage = () => {
+  const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordInput>({ resolver: zodResolver(forgotPasswordSchema) });
+  const { mutate: forgotPassword, isPending, isSuccess, reset } = useForgotPassword();
   return (
-    <AuthLayout 
-      title="Reset Password" 
-      subtitle="Enter your email to receive a reset link"
-      backButton={
-        <Link to="/login" className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-slate-900">
-          <ArrowLeft className="w-4 h-4" /> Back to Login
-        </Link>
-      }
-    >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
-        <div className="space-y-1">
-          <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-            Email
-          </label>
-          <input
-            {...register('email')}
-            type="email"
-            placeholder="hello@hanu.edu.vn"
-            className={`w-full border-b py-2.5 text-sm text-slate-900 placeholder-gray-300 focus:outline-none bg-transparent font-medium transition-colors ${
-              errors.email ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-slate-900'
-            }`}
-          />
-          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
-        </div>
-
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full flex items-center justify-center py-3.5 px-4 bg-[#1a1a1a] hover:bg-black disabled:bg-gray-400 text-white font-semibold text-sm rounded-full shadow-md transition-all duration-200"
-          >
-            {isPending ? (
-              <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-            ) : (
-              <span>Send Reset Link</span>
-            )}
-          </button>
-        </div>
+    <BrightAuthLayout variant="forgot" title="Quên mật khẩu?" subtitle="Nhập email đã đăng ký. Chúng tôi sẽ gửi hướng dẫn để bạn tạo mật khẩu mới.">
+      {isSuccess && <div className="auth-notice" role="status">Nếu email này đã được đăng ký, bạn sẽ nhận được liên kết đặt lại mật khẩu. Hãy kiểm tra hộp thư đến và thư mục thư rác.</div>}
+      <form onSubmit={handleSubmit((data) => forgotPassword(data))} className="auth-form" noValidate aria-busy={isPending}>
+        <AuthField label="Email đã đăng ký" type="email" autoComplete="email" placeholder="ban@hanu.edu.vn" {...register('email', { onChange: () => { if (isSuccess) reset(); } })} error={errors.email?.message} />
+        <button type="submit" disabled={isPending} className="auth-submit">{isPending ? 'Đang gửi yêu cầu…' : <><Mail size={17} /> {isSuccess ? 'Gửi lại liên kết' : 'Gửi liên kết khôi phục'}</>}</button>
       </form>
-    </AuthLayout>
+      <Link to="/login" className="auth-link auth-back"><ArrowLeft size={16} /> Quay lại đăng nhập</Link>
+    </BrightAuthLayout>
   );
 };

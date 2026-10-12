@@ -14,7 +14,7 @@ export const Footer: React.FC = () => {
                 <Code2 className="w-4 h-4 stroke-[2.5]" />
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-xl font-extrabold tracking-tight text-slate-900">CodePath</span>
+                <span className="text-xl font-extrabold tracking-tight text-slate-900">CodePart</span>
                 <span className="text-xs font-bold text-blue-600 tracking-wider uppercase">Academy</span>
               </div>
             </div>
@@ -89,7 +89,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom copyright bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© 2026 CodePath Academy. Toàn bộ bản quyền được bảo lưu.</p>
+          <p>© 2026 CodePart Academy. Toàn bộ bản quyền được bảo lưu.</p>
           <div className="flex items-center gap-6">
             <a href="#terms" className="hover:text-blue-600 transition">Điều khoản dịch vụ</a>
             <a href="#privacy" className="hover:text-blue-600 transition">Chính sách bảo mật</a>
