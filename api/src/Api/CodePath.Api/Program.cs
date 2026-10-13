@@ -343,9 +343,13 @@ builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
-// Auto-migration via Program API (thay thế Tool CodePath.Migrator độc lập).
-// Domain owns constraints qua IEntityTypeConfiguration, Api orchestrate MigrateAsync().
-await app.MigrateDatabasesAsync();
+// Chỉ chạy migration và seed khi truyền cờ --migrate rõ ràng (ví dụ: dotnet run -- --migrate).
+// Mặc định dotnet run KHÔNG tự ý chạy migration để tránh ảnh hưởng DB.
+if (args.Contains("--migrate"))
+{
+    await app.MigrateDatabasesAsync();
+    return;
+}
 
 app.UseForwardedHeaders();
 app.UseMiddleware<CorrelationIdMiddleware>();

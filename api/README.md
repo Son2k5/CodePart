@@ -42,9 +42,10 @@ MySQL 8.4 (Pomelo), Redis và Judge0.
    dotnet run --project src/Api/CodePath.Api/CodePath.Api.csproj
    ```
 
-API tự chạy migration `InitialCreate` và seed bài tập mẫu. Hai tài khoản
-`admin01`/`admin02` chỉ được seed khi `ADMIN01_PASSWORD` và `ADMIN02_PASSWORD`
-đã được cấu hình và thỏa chính sách mật khẩu.
+Mặc định `dotnet run` sẽ KHÔNG tự động chạy migration.
+Để chạy migration và seed tài khoản Admin + bài tập mẫu:
+- Cập nhật database: `dotnet ef database update --project src/Infrastructure/CodePath.Infrastructure/CodePath.Infrastructure.csproj --startup-project src/Api/CodePath.Api/CodePath.Api.csproj`
+- Hoặc chạy lệnh migrate/seed rõ ràng: `dotnet run --project src/Api/CodePath.Api/CodePath.Api.csproj -- --migrate` (yêu cầu cấu hình `ADMIN01_PASSWORD` và `ADMIN02_PASSWORD` trong `.env`).
 
 Kiểm tra readiness tại `GET /health`; response phải có hai check `mysql` và
 `redis` ở trạng thái `healthy`.

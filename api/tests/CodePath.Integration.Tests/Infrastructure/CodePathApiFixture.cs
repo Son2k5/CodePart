@@ -1,3 +1,4 @@
+using CodePath.Api.Extensions;
 using Testcontainers.MySql;
 using Testcontainers.Redis;
 using Xunit;
@@ -57,6 +58,8 @@ public sealed class CodePathApiFixture : IAsyncLifetime
             AllowAutoRedirect = false,
             HandleCookies = false
         });
+
+        await Factory.Services.MigrateDatabasesAsync();
     }
 
     public async Task DisposeAsync()

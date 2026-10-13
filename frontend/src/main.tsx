@@ -15,12 +15,11 @@ const queryClient = new QueryClient({
 });
 
 async function enableMocking() {
-  if (import.meta.env.MODE !== 'development') {
+  if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKS !== 'true') {
     return;
   }
   const { worker } = await import('./mocks/browser');
-  // `worker.start()` returns a Promise that resolves
-  // once the Service Worker is up and ready to intercept requests.
+  // Mock authentication is opt-in; normal development uses the real API.
   return worker.start();
 }
 

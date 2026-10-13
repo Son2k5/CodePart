@@ -1,3 +1,4 @@
+using CodePath.Application.Auth;
 using CodePath.Application.Auth.Abstractions;
 using CodePath.Domain.Users.Entities;
 using CodePath.Infrastructure.Persistence;
@@ -18,14 +19,18 @@ public static class AdminSeeder
     {
         if (!seedOptions.IsConfigured)
         {
-            logger.LogWarning("Mật khẩu Admin Seed (ADMIN01_PASSWORD / ADMIN02_PASSWORD) chưa được cấu hình. Bỏ qua seeding để bảo đảm an toàn hệ thống.");
+            logger.LogWarning("There are some problems with service");
             return;
         }
 
-        if (!seedOptions.HasValidPasswords)
+        if (!PasswordPolicy.IsValid(seedOptions.Admin01Password))
         {
-            throw new InvalidOperationException(
-                "Admin seed passwords must satisfy the application password policy.");
+            throw new InvalidOperationException();
+        }
+
+        if (!PasswordPolicy.IsValid(seedOptions.Admin02Password))
+        {
+            throw new InvalidOperationException();
         }
 
         var adminsToSeed = new[]

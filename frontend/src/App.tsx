@@ -57,7 +57,29 @@ const router = createBrowserRouter([
       {
         element: <RoleGuard allowedRoles={['Admin']} />,
         children: [
-          { path: '/admin', element: <div className="p-8">Admin Dashboard</div> },
+          {
+            path: '/admin',
+            lazy: async () => ({ Component: (await import('./features/admin/layouts/AdminLayout')).AdminLayout }),
+            children: [
+              { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+              {
+                path: 'dashboard',
+                lazy: async () => ({ Component: (await import('./features/admin/pages/AdminDashboardPage')).AdminDashboardPage }),
+              },
+              {
+                path: 'users',
+                element: <Navigate to="/admin/students" replace />,
+              },
+              {
+                path: 'students',
+                lazy: async () => ({ Component: (await import('./features/admin/pages/StudentManagementPage')).StudentManagementPage }),
+              },
+              {
+                path: 'teachers',
+                lazy: async () => ({ Component: (await import('./features/admin/pages/TeacherManagementPage')).TeacherManagementPage }),
+              },
+            ],
+          },
         ],
       },
       {

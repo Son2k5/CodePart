@@ -7,6 +7,10 @@
 .education-nav__links a { padding: 7px 0; color: #727c80; font-size: 12px; letter-spacing: 1.7px; text-transform: uppercase; white-space: nowrap; }
 .education-nav__links a[aria-current] { text-decoration: underline; text-underline-offset: 9px; text-decoration-thickness: 1px; }
 .education-nav__links a:hover { color: #3e656b; }
+.education-nav__actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.education-nav__login { padding: 9px 20px; border: 1px solid #3e656b; border-radius: 24px; color: #3e656b; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.education-nav__login:hover { background: #edf9fa; }
+.education-nav__actions button:focus-visible { outline: 2px solid #3e656b; outline-offset: 3px; }
 .education-nav__signup { background: #7bd14e; color: #fff; padding: 10px 25px; border-radius: 24px; font-size: 14px; font-weight: 600; box-shadow: 0 5px 18px #5b98782b; white-space: nowrap; }
 .education-nav__signup:hover { background: #68bd3c; }
 .education-nav__menu { position: absolute; top: 99px; left: 56px; min-width: 240px; padding: 16px; background: #fff; box-shadow: 0 12px 32px #263b4021; display: grid; gap: 3px; }
@@ -41,12 +45,13 @@
   .education-hero__art { width: 57%; bottom: 30px; right: -24px; }
 }
 @media (max-width: 760px) {
-  .education-nav__inner { height: 88px; padding: 0 24px; }
+  .education-nav__inner { min-height: 88px; height: auto; padding: 18px 24px; flex-wrap: wrap; gap: 12px; }
   .education-nav__brand { gap: 15px; }
   .education-nav__brand > a { font-size: 21px; }
   .education-nav__links { display: none; }
-  .education-nav__signup { padding: 9px 20px; font-size: 13px; }
-  .education-nav__menu { top: 76px; left: 24px; right: 24px; }
+  .education-nav__actions { gap: 8px; margin-left: auto; }
+  .education-nav__login, .education-nav__signup { padding: 9px 14px; font-size: 13px; }
+  .education-nav__menu { top: 100%; left: 24px; right: 24px; }
   .education-hero__inner { min-height: 0; padding: 28px 24px 22px; display: flex; flex-direction: column; }
   .education-hero__copy { width: 100%; padding: 0; }
   .education-hero__eyebrow { font-size: 18px; margin-bottom: 21px; }

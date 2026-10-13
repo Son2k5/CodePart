@@ -1,0 +1,110 @@
+HƯỚNG DẪN CHẠY DỰ ÁN CODEPATH
+Các lệnh dưới đây chạy trong PowerShell.
+
+1. CHUẨN BỊ
+
+- Cài .NET SDK hỗ trợ .NET 8, Node.js và npm.
+- Bật MySQL local và Docker Desktop (Linux containers) để chạy Redis.
+- Cấu hình api/.env theo api/.env.example nếu chưa có; không ghi đè file hiện có.
+- Để trống VITE_API_BASE_URL để frontend gọi /api qua proxy cùng origin.
+- Nếu api/.env có AuthFrontend__PublicBaseUrl hoặc Cors__AllowedOrigins__*,
+  cập nhật sang https://localhost:5173 vì environment ghi đè appsettings.
+
+2. CẤP CERT HTTPS LOCAL (LẦN ĐẦU HOẶC KHI GIA HẠN)
+
+cd D:\KLTN\CodePart
+New-Item -ItemType Directory -Force api/secrets/dev | Out-Null
+dotnet dev-certs https --trust --export-path api/secrets/dev/localhost.pem --format PEM --no-password
+
+Chấp nhận yêu cầu tin cậy chứng chỉ nếu Windows hiện thông báo.
+Lệnh tạo hoặc tái sử dụng chứng chỉ localhost của user hiện tại.
+Certificate: api/secrets/dev/localhost.pem
+Private key: api/secrets/dev/localhost.key
+Các file cert được Git ignore. Không chia sẻ private key.
+Sau khi gia hạn cert, khởi động lại backend và frontend.
+
+3. CHẠY DEVELOPMENT
+
+Terminal 1 - Redis và backend:
+
+cd D:\KLTN\CodePart\api
+docker compose up -d redis
+dotnet run  --launch -profile https --project src/Api/CodePath.Api/CodePath.Api.csproj
+
+Terminal 2 - frontend:
+
+cd D:\KLTN\CodePart\frontend
+npm ci
+npm run dev
+
+npm ci dùng khi cài lần đầu hoặc package-lock.json thay đổi.
+Những lần sau chỉ cần npm run dev.
+
+Frontend: https://localhost:5173
+Swagger: https://localhost:5001/swagger
+API: https://localhost:5001
+Vite proxy /api, /health và /swagger đến API qua HTTPS có xác minh cert.
+API HTTP cổng 5000 chuyển hướng sang HTTPS cổng 5001.
+
+4. CHẠY PREVIEW FRONTEND SAU KHI BUILD
+
+Giữ backend và Redis chạy như mục 3. Trong terminal frontend:
+
+cd D:\KLTN\CodePart\frontend
+npm run build
+npm run preview
+
+Truy cập https://localhost:4173
+Preview dùng HTTPS và proxy API; chỉ dành cho kiểm tra local.
+
+5. KIỂM TRA KẾT NỐI
+
+curl.exe https://localhost:5001/health/live
+curl.exe https://localhost:5173/health
+
+/health/live kiểm tra API đang chạy.
+/health kiểm tra MySQL và Redis; cả hai phải healthy để readiness đạt.
+Nếu dùng preview, thay cổng 5173 bằng 4173.
+
+6. DATABASE MỚI (CHỈ CHẠY KHI CẦN ÁP DỤNG MIGRATION)
+
+Lệnh sau thay đổi schema database đã cấu hình trong api/.env.
+Yêu cầu công cụ dotnet-ef tương thích EF Core 8 đã cài.
+
+cd D:\KLTN\CodePart\api
+dotnet ef database update --project src/Infrastructure/CodePath.Infrastructure/CodePath.Infrastructure.csproj --startup-project src/Api/CodePath.Api/CodePath.Api.csproj
+
+dotnet run thông thường không tự chạy migration hoặc seed.
+
+7. CHẠY DOCKER PRODUCTION
+
+Chuẩn bị api/.env.production từ api/.env.production.example nếu chưa có.
+Điền SERVER_NAME, kết nối MySQL bên ngoài Docker và cấu hình các dịch vụ.
+Tạo đầy đủ file secrets được khai báo trong api/docker-compose.production.yml.
+Certificate cho domain thật: api/secrets/tls/fullchain.pem
+Private key cho domain thật: api/secrets/tls/privkey.pem
+Cert localhost ở mục 2 không thay thế cert domain production.
+
+Sau khi chuẩn bị đầy đủ:
+
+cd D:\KLTN\CodePart\api
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml config --quiet
+docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build
+
+Truy cập https://<SERVER_NAME>
+Nginx mở cổng 80/443 và proxy đến API HTTP 8080 trong mạng Docker nội bộ.
+MySQL không được Compose tạo hoặc quản lý.
+Production chưa được kiểm chứng trong quá trình cấu hình HTTPS local.
+
+8. DỪNG DỰ ÁN VÀ LỖI THƯỜNG GẶP
+
+- Nhấn Ctrl+C tại mỗi terminal để dừng backend/frontend.
+- Nếu cổng đang được dùng, dừng phiên chạy cũ trước khi chạy lại.
+- Nếu thiếu localhost.pem hoặc localhost.key, chạy lại mục 2.
+- Nếu Redis unhealthy hoặc không kết nối được Docker daemon, bật Docker Desktop,
+  rồi chạy lại docker compose up -d redis trong thư mục api.
+- Nếu MySQL unhealthy, kiểm tra dịch vụ MySQL và thông tin kết nối api/.env.
+- Để dừng Redis local:
+
+cd D:\KLTN\CodePart\api
+docker compose stop redis

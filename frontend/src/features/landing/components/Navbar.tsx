@@ -29,7 +29,10 @@ export function Navbar({ navItems = [], activeSection = 'home', onLoginClick, on
         <nav className="education-nav__links" aria-label="Điều hướng chính">
           {primaryLinks.map((item) => <a key={item.id} href={item.href} aria-current={activeSection === item.id ? 'location' : undefined}>{item.label}</a>)}
         </nav>
-        <button className="education-nav__signup" onClick={onRegisterClick}>Đăng ký</button>
+        <div className="education-nav__actions">
+          <button className="education-nav__login" onClick={() => { setMenuOpen(false); onLoginClick() }}>Đăng nhập</button>
+          <button className="education-nav__signup" onClick={onRegisterClick}>Đăng ký</button>
+        </div>
         {menuOpen && (
           <nav id="education-menu" className="education-nav__menu" aria-label="Menu mở rộng">
             {navItems.map((item) => <a key={item.id} href={item.href} onClick={() => setMenuOpen(false)}>{item.label}</a>)}

@@ -2,7 +2,7 @@ namespace CodePath.Application.Auth;
 
 public static class PasswordPolicy
 {
-    public const int MinimumLength = 12;
+    public const int MinimumLength = 8;
     public const int MaximumLength = 128;
 
     public static bool IsValid(string? password)

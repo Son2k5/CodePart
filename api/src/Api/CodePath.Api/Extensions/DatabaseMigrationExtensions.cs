@@ -10,9 +10,12 @@ namespace CodePath.Api.Extensions;
 /// </summary>
 public static class DatabaseMigrationExtensions
 {
-    public static async Task MigrateDatabasesAsync(this WebApplication app)
+    public static Task MigrateDatabasesAsync(this WebApplication app) =>
+        app.Services.MigrateDatabasesAsync();
+
+    public static async Task MigrateDatabasesAsync(this IServiceProvider serviceProvider)
     {
-        using var scope = app.Services.CreateScope();
+        using var scope = serviceProvider.CreateScope();
         var services = scope.ServiceProvider;
         var logger = services.GetRequiredService<ILogger<Program>>();
 
