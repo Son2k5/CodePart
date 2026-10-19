@@ -3,15 +3,15 @@ using CodePath.Shared.Kernel.Entities;
 
 namespace CodePath.Domain.Users.Entities;
 
-public sealed class Class : BaseEntity
+public sealed partial class Class : BaseEntity
 {
     public string Name { get; private set; } = default!;
     public string AcademicYear { get; private set; } = default!;
 
-    public Guid FacultyId { get; private set; }
+    public Guid? FacultyId { get; private set; }
     public Faculty Faculty { get; private set; } = default!;
 
-    public Guid TeacherId { get; private set; }
+    public Guid? TeacherId { get; private set; }
     public User Teacher { get; private set; } = default!;
 
     public ICollection<User> Students { get; private set; } = new List<User>();

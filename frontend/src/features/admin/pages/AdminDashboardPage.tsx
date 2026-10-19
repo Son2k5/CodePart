@@ -6,20 +6,25 @@ import {
   GraduationCap,
   Clock,
   ArrowRight,
-  TrendingUp,
   Sparkles,
 } from 'lucide-react';
-import { INITIAL_MOCK_USERS, calculateMockStats } from '../data/mockAdminData';
+import { useTeachers, useTeacherStats } from '../hooks/useTeachers';
+import { teacherError } from '../api/adminTeacherApi';
 import { UserRoleBadge } from '../components/UserRoleBadge';
 import { UserStatusBadge } from '../components/UserStatusBadge';
 
 export const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const stats = calculateMockStats(INITIAL_MOCK_USERS);
-  const pendingTeachers = INITIAL_MOCK_USERS.filter(
-    (u) => u.role === 'Teacher' && u.status === 'Pending'
-  );
-  const recentUsers = INITIAL_MOCK_USERS.slice(0, 5);
+  const overview = useTeacherStats();
+  const pending = useTeachers({ status: 'Pending', page: 1, pageSize: 5, sortBy: 'created_asc' });
+  const recent = useTeachers({ page: 1, pageSize: 5, sortBy: 'created_desc' });
+  const stats = { totalTeachers: overview.data?.totalTeachers ?? 0, pendingApprovals: overview.data?.pendingApprovals ?? 0,
+    activeTeachers: overview.data?.activeTeachers ?? 0, disabledTeachers: overview.data?.disabledTeachers ?? 0 };
+  const pendingTeachers = pending.data?.items ?? [];
+  const recentUsers = recent.data?.items ?? [];
+
+  if (overview.isPending || pending.isPending || recent.isPending) return <p role="status">Đang tải tổng quan…</p>;
+  if (overview.error || pending.error || recent.error) return <p role="alert">{teacherError(overview.error || pending.error || recent.error)} <button onClick={() => { void overview.refetch(); void pending.refetch(); void recent.refetch(); }}>Thử lại</button></p>;
 
   return (
     <div className="space-y-6">
@@ -34,7 +39,7 @@ export const AdminDashboardPage: React.FC = () => {
             Chào mừng Quản trị viên, chúc một ngày làm việc hiệu quả!
           </h1>
           <p className="text-sky-100 text-xs sm:text-sm leading-relaxed">
-            Hệ thống đang phục vụ {stats.totalUsers} người dùng thuộc trường Đại học Hà Nội (HANU).
+            Hệ thống đang quản lý {stats.totalTeachers} giáo viên thuộc trường Đại học Hà Nội (HANU).
             {stats.pendingApprovals > 0 ? (
               <span className="font-semibold text-amber-300">
                 {' '}Hiện có {stats.pendingApprovals} hồ sơ giáo viên đang chờ xét duyệt cấp quyền giảng dạy.
@@ -45,10 +50,10 @@ export const AdminDashboardPage: React.FC = () => {
           <div className="pt-2 flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate('/admin/students')}
+              onClick={() => navigate('/admin/teachers')}
               className="px-4 py-2 rounded-xl bg-white text-sky-800 text-xs font-bold hover:bg-sky-50 shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <span>Quản lý người dùng</span>
+              <span>Quản lý giáo viên</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             {stats.pendingApprovals > 0 && (
@@ -72,10 +77,10 @@ export const AdminDashboardPage: React.FC = () => {
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">Tổng người dùng</div>
-            <div className="text-2xl font-bold text-slate-900">{stats.totalUsers}</div>
+            <div className="text-xs text-slate-400 font-medium">Tổng giáo viên</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.totalTeachers}</div>
             <div className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
-              <TrendingUp className="w-3 h-3" /> +12% so với tháng trước
+              Số liệu từ hệ thống
             </div>
           </div>
         </div>
@@ -85,8 +90,8 @@ export const AdminDashboardPage: React.FC = () => {
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">Giáo viên / Giảng viên</div>
-            <div className="text-2xl font-bold text-slate-900">{stats.totalTeachers}</div>
+            <div className="text-xs text-slate-400 font-medium">Giáo viên đang hoạt động</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.activeTeachers}</div>
             <div className="text-[11px] text-slate-500 font-medium mt-0.5">
               {stats.pendingApprovals} giảng viên chờ duyệt
             </div>
@@ -98,10 +103,10 @@ export const AdminDashboardPage: React.FC = () => {
             <GraduationCap className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-400 font-medium">Sinh viên (HANU)</div>
-            <div className="text-2xl font-bold text-slate-900">{stats.totalStudents}</div>
+            <div className="text-xs text-slate-400 font-medium">Giáo viên đã khóa</div>
+            <div className="text-2xl font-bold text-slate-900">{stats.disabledTeachers}</div>
             <div className="text-[11px] text-slate-500 font-medium mt-0.5">
-              {stats.activeUsers} đang hoạt động
+              Có thể mở lại tài khoản
             </div>
           </div>
         </div>
@@ -130,7 +135,7 @@ export const AdminDashboardPage: React.FC = () => {
                 <Clock className="w-4 h-4" />
               </div>
               <h2 className="text-sm font-bold text-slate-900">
-                Hồ sơ giáo viên chờ duyệt ({pendingTeachers.length})
+                Hồ sơ giáo viên chờ duyệt ({stats.pendingApprovals})
               </h2>
             </div>
             <button
@@ -182,11 +187,11 @@ export const AdminDashboardPage: React.FC = () => {
               <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center font-bold">
                 <Users className="w-4 h-4" />
               </div>
-              <h2 className="text-sm font-bold text-slate-900">Người dùng mới tham gia</h2>
+              <h2 className="text-sm font-bold text-slate-900">Giáo viên mới tham gia</h2>
             </div>
             <button
               type="button"
-              onClick={() => navigate('/admin/students')}
+              onClick={() => navigate('/admin/teachers')}
               className="text-xs font-semibold text-sky-600 hover:text-sky-700"
             >
               Toàn bộ danh sách →

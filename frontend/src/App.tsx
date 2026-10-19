@@ -5,6 +5,7 @@ import { ProtectedRoute } from './routes/ProtectedRoute';
 import { RoleGuard } from './routes/RoleGuard';
 import { useAuthStore } from './features/auth/store/authStore';
 import { refreshSession } from './lib/axios';
+import { AutoLogoutProvider } from './features/auth/components/AutoLogoutProvider';
 
 const DashboardRedirect = () => {
   const { user } = useAuthStore();
@@ -15,6 +16,7 @@ const DashboardRedirect = () => {
 };
 
 const router = createBrowserRouter([
+  { path: '/design', lazy: async () => ({ Component: (await import('./features/workspace/DesignSystemPage')).DesignSystemPage }) },
   {
     path: '/',
     lazy: async () => {
@@ -62,6 +64,10 @@ const router = createBrowserRouter([
             lazy: async () => ({ Component: (await import('./features/admin/layouts/AdminLayout')).AdminLayout }),
             children: [
               { index: true, element: <Navigate to="/admin/dashboard" replace /> },
+              { path: 'classes', lazy: async () => ({ Component: (await import('./features/classes/ClassListPage')).ClassListPage }) },
+              { path: 'classes/new', lazy: async () => ({ Component: (await import('./features/classes/ClassFormPage')).ClassFormPage }) },
+              { path: 'classes/:id', lazy: async () => ({ Component: (await import('./features/classes/ClassDetailPage')).ClassDetailPage }) },
+              { path: 'classes/:id/edit', lazy: async () => ({ Component: (await import('./features/classes/ClassFormPage')).ClassFormPage }) },
               {
                 path: 'dashboard',
                 lazy: async () => ({ Component: (await import('./features/admin/pages/AdminDashboardPage')).AdminDashboardPage }),
@@ -85,13 +91,20 @@ const router = createBrowserRouter([
       {
         element: <RoleGuard allowedRoles={['Teacher']} />,
         children: [
-          { path: '/teacher', element: <div className="p-8">Teacher Dashboard</div> },
+          { path: '/teacher', lazy: async () => ({ Component: (await import('./features/teacher/layouts/TeacherLayout')).TeacherLayout }), children: [
+            { index: true, element: <Navigate to="/teacher/courses" replace /> },
+            { path: 'courses', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherCoursesPage')).TeacherCoursesPage }) },
+            { path: 'courses/:id', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherCourseDetailPage')).TeacherCourseDetailPage }) },
+            { path: 'courses/:id/submissions', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherCourseDetailPage')).TeacherCourseDetailPage }) },
+            { path: 'classes', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherClassesPage')).TeacherClassesPage }) },
+          ] },
         ],
       },
       {
         element: <RoleGuard allowedRoles={['Student']} />,
         children: [
-          { path: '/courses', element: <div className="p-8">Student Courses</div> },
+          { path: '/courses', lazy: async () => ({ Component: (await import('./features/teacher/pages/StudentCoursesPage')).StudentCoursesPage }) },
+          { path: '/classes', lazy: async () => ({ Component: (await import('./features/classes/PublicClassesPage')).PublicClassesPage }) },
           {
             path: '/exercise/:slug',
             lazy: async () => {
@@ -101,6 +114,13 @@ const router = createBrowserRouter([
           },
         ],
       },
+      { element: <RoleGuard allowedRoles={['Admin', 'Teacher']} />, children: [{ path: '/manage/problems', lazy: async () => ({ Component: (await import('./features/code-judge/JudgeAdminPage')).JudgeAdminPage }) }] },
+      { element: <RoleGuard allowedRoles={['Student']} />, children: [
+        { path: '/problems', lazy: async () => ({ Component: (await import('./features/code-judge/JudgePage')).ProblemListPage }) },
+        { path: '/classes/:classId/topics/:slug/problems/:problemId', lazy: async () => ({ Component: (await import('./features/workspace/WorkspacePage')).WorkspacePage }) },
+        { path: '/problems/:id', lazy: async () => ({ Component: (await import('./features/code-judge/JudgePage')).JudgePage }) },
+      ] },
+      { path: '/classes/:classId/learning', lazy: async () => ({ Component: (await import('./features/learning/LearningPage')).LearningPage }) },
       { path: '/dashboard', element: <DashboardRedirect /> },
     ],
   },
@@ -117,5 +137,5 @@ export default function App() {
     return <div className="min-h-screen bg-white" aria-label="Loading session" />;
   }
 
-  return <RouterProvider router={router} />;
+  return <AutoLogoutProvider onLogout={() => { void router.navigate('/login', { replace: true }); }}><RouterProvider router={router} /></AutoLogoutProvider>;
 }

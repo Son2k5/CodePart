@@ -9,6 +9,17 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
     public void Configure(EntityTypeBuilder<Class> builder)
     {
         builder.ToTable("classes");
+        builder.HasQueryFilter(c => !c.IsDeleted);
+        builder.Property(c => c.Description).HasMaxLength(5000);
+        builder.Property(c => c.Thumbnail).HasMaxLength(2048);
+        builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(c => c.AccessType).HasConversion<string>().HasMaxLength(20);
+        builder.Property(c => c.JoinCode).HasMaxLength(8).UseCollation("ascii_bin").HasCharSet("ascii");
+        builder.Property(c => c.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+        // MySQL UNIQUE permits multiple NULLs; filtered indexes are not supported.
+        builder.HasIndex(c => c.JoinCode).IsUnique().HasDatabaseName("ux_classes_join_code");
+        builder.HasIndex(c => new { c.Status, c.AccessType });
+        builder.HasIndex(c => c.Name);
 
         // Primary Key
         builder.HasKey(c => c.Id);
@@ -24,10 +35,10 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
             .HasMaxLength(20);
 
         builder.Property(c => c.FacultyId)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(c => c.TeacherId)
-            .IsRequired();
+            .IsRequired(false);
 
         // Audit Fields (BaseEntity)
         builder.Property(c => c.CreatedAt)

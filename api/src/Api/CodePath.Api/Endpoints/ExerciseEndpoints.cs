@@ -15,9 +15,9 @@ public static class ExerciseEndpoints
     {
         var group = app.MapGroup("/api/exercises").WithTags("Exercises");
 
-        group.MapGet("/{slug}", async (string slug, ISender sender, CancellationToken cancellationToken) =>
+        group.MapGet("/{slug}", async (string slug, HttpContext context, ISender sender, CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new GetExerciseQuery(slug), cancellationToken);
+            var result = await sender.Send(new GetExerciseQuery(slug, context.User.GetUserId()), cancellationToken);
             return result.ToHttpResult();
         })
         .WithName("GetExercise")
@@ -28,11 +28,12 @@ public static class ExerciseEndpoints
         group.MapPost("/{exerciseId:guid}/run", async (
             Guid exerciseId,
             RunCodeRequest request,
+            HttpContext context,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
             var result = await sender.Send(new RunCodeCommand(
-                exerciseId, request.Language, request.SourceCode, request.CustomInput), cancellationToken);
+                exerciseId, request.Language, request.SourceCode, request.CustomInput, context.User.GetUserId()), cancellationToken);
             return result.ToHttpResult();
         })
         .WithName("RunExerciseCode")

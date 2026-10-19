@@ -5,6 +5,24 @@ namespace CodePath.Domain.Exercises.Entities;
 
 public sealed class Submission : BaseEntity
 {
+    public decimal? TeacherScore { get; private set; }
+    public string? TeacherFeedback { get; private set; }
+    public Guid? GradedBy { get; private set; }
+    public DateTime? GradedAt { get; private set; }
+
+    public void Grade(decimal score, string? feedback, Guid teacherId, DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (score is < 0 or > 10 || decimal.Round(score, 2) != score || feedback?.Length > 2000 || teacherId == Guid.Empty)
+            throw new CodePath.Domain.Common.Exceptions.DomainValidationException("Score must be 0–10 with at most two decimal places; feedback is limited to 2000 characters.");
+        if (Status == SubmissionStatus.Pending)
+            throw new CodePath.Domain.Common.Exceptions.DomainRuleViolationException("A pending submission cannot be graded.");
+        TeacherScore = score;
+        TeacherFeedback = string.IsNullOrWhiteSpace(feedback) ? null : feedback.Trim();
+        GradedBy = teacherId;
+        GradedAt = utcNow;
+        Touch(utcNow, teacherId.ToString());
+    }
     public Guid ExerciseId { get; private set; }
     public Exercise Exercise { get; private set; } = default!;
     public Guid StudentId { get; private set; }

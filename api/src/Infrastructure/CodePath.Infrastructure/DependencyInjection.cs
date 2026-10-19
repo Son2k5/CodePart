@@ -106,7 +106,9 @@ public static class InfrastructureDependencyInjection
         services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<IUsersDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<IAdminDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<CodePath.Application.Classes.IClassRepository>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<IExerciseDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<CodePath.Application.Teaching.Abstractions.ITeachingDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         services.AddHealthChecks()
             .AddCheck<MySqlHealthCheck>("mysql", tags: ["ready"])
@@ -167,10 +169,12 @@ public static class InfrastructureDependencyInjection
 
         services.AddOptions<AuthSessionOptions>()
             .Bind(configuration.GetSection(AuthSessionOptions.SectionName))
+            .Validate(o => o.IdleTimeoutMinutes > 0 && o.ActivityUpdateThrottleMinutes > 0
+                && o.ActivityUpdateThrottleMinutes < o.IdleTimeoutMinutes, "Activity throttle must be positive and shorter than idle timeout.")
             .Validate(options => options.RefreshTokenLifetimeDays is >= 7 and <= 30,
                 "Refresh token lifetime must be between 7 and 30 days.")
-            .Validate(options => options.RefreshTokenAbsoluteLifetimeDays is >= 7 and <= 30,
-                "Absolute refresh token lifetime must be between 7 and 30 days.")
+            .Validate(options => options.RefreshTokenAbsoluteLifetimeDays == 7,
+                "Absolute session lifetime must be 7 days.")
             .Validate(options => options.RefreshTokenAbsoluteLifetimeDays >= options.RefreshTokenLifetimeDays,
                 "Absolute refresh token lifetime cannot be shorter than the rolling lifetime.")
             .Validate(options => options.CookieSameSite is "Strict" or "Lax" or "None",

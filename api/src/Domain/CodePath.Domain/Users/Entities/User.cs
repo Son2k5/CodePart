@@ -13,6 +13,9 @@ public sealed class User : BaseEntity
     public UserRole Role { get; private set; }
     public UserStatus Status { get; private set; }
     public string? StudentId { get; private set; }
+    public string? TeacherId { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? Bio { get; private set; }
     public DateTime? EmailVerifiedAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
     public long SecurityVersion { get; private set; } = 1;
@@ -28,6 +31,48 @@ public sealed class User : BaseEntity
     public ICollection<Enrollment> Enrollments { get; private set; } = new List<Enrollment>();
 
     private User() { }
+
+    public static User CreateTeacherByAdmin(string fullName, string email, string passwordHash,
+        string? teacherId, Guid? facultyId, string? phoneNumber, string? bio,
+        UserStatus status, DateTime utcNow)
+    {
+        if (status is not (UserStatus.Active or UserStatus.Pending))
+            throw new DomainValidationException("New teachers must be Active or Pending.", nameof(status));
+        var user = CreateTeacher(fullName, email, passwordHash, utcNow);
+        user.UpdateTeacherProfile(fullName, teacherId, facultyId, phoneNumber, bio, utcNow);
+        user.VerifyEmail(utcNow);
+        if (status == UserStatus.Active) user.ApproveTeacher(utcNow);
+        return user;
+    }
+
+    public void UpdateTeacherProfile(string fullName, string? teacherId, Guid? facultyId,
+        string? phoneNumber, string? bio, DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (Role != UserRole.Teacher)
+            throw new DomainRuleViolationException("Only teachers have a teacher profile.", ErrorCodes.Conflict);
+        if (string.IsNullOrWhiteSpace(fullName) || fullName.Trim().Length > 200)
+            throw new DomainValidationException("Full name must contain 1 to 200 characters.", nameof(fullName));
+        if (teacherId?.Trim().Length > 50 || phoneNumber?.Trim().Length > 20 || bio?.Trim().Length > 1000)
+            throw new DomainValidationException("Teacher profile exceeds the allowed length.");
+        if (facultyId == Guid.Empty)
+            throw new DomainValidationException("Faculty ID cannot be empty.", nameof(facultyId));
+        FullName = fullName.Trim();
+        TeacherId = string.IsNullOrWhiteSpace(teacherId) ? null : teacherId.Trim().ToUpperInvariant();
+        PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+        Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
+        FacultyId = facultyId;
+        Touch(utcNow);
+    }
+
+    public void Enable(DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (Status != UserStatus.Disabled)
+            throw new DomainRuleViolationException("Only disabled accounts can be enabled.", ErrorCodes.Conflict);
+        IncrementSecurityVersion(utcNow);
+        Status = UserStatus.Active;
+    }
 
     public static User CreateStudent(
         string fullName,

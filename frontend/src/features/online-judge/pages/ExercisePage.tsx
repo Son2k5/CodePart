@@ -24,9 +24,10 @@ export const ExercisePage = () => {
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   const [language, setLanguage] = useState(LANGUAGES[0]);
-  const [code, setCode] = useState('def twoSum(nums, target):\n    # Write your code here\n    pass');
+  const [code, setCode] = useState('');
   const [customInput, setCustomInput] = useState('');
   
   const [isRunning, setIsRunning] = useState(false);
@@ -37,25 +38,32 @@ export const ExercisePage = () => {
   const [activeTab, setActiveTab] = useState<'testcases' | 'result'>('testcases');
 
   useEffect(() => {
+    let cancelled = false;
     if (slug) {
       judgeApi.getExerciseBySlug(slug)
         .then(data => {
+          if (cancelled) return;
           setExercise(data);
+          setCode(data.starterCode || '');
+          setLanguage(LANGUAGES.find(l => l.value === data.supportedLanguages[0]) ?? LANGUAGES[0]);
           if (data.testCases.length > 0) {
             setCustomInput(data.testCases[0].input);
           }
           setLoading(false);
         })
         .catch(err => {
+          if (cancelled) return;
           setError(err.message);
           setLoading(false);
         });
     }
+    return () => { cancelled = true; };
   }, [slug]);
 
   const handleRunCode = async () => {
     if (!exercise) return;
     setIsRunning(true);
+    setExecutionError(null);
     setRunResult(null);
     setSubmitResult(null);
     setActiveTab('result');
@@ -63,7 +71,7 @@ export const ExercisePage = () => {
       const result = await judgeApi.runCode(exercise.id, language.value, code, customInput);
       setRunResult(result);
     } catch (err: any) {
-      setError(err.message);
+      setExecutionError(err.response?.data?.detail || err.message);
     } finally {
       setIsRunning(false);
     }
@@ -72,6 +80,7 @@ export const ExercisePage = () => {
   const handleSubmitCode = async () => {
     if (!exercise) return;
     setIsSubmitting(true);
+    setExecutionError(null);
     setRunResult(null);
     setSubmitResult(null);
     setActiveTab('result');
@@ -79,7 +88,7 @@ export const ExercisePage = () => {
       const result = await judgeApi.submitCode(exercise.id, language.value, code);
       setSubmitResult(result);
     } catch (err: any) {
-      setError(err.message);
+      setExecutionError(err.response?.data?.detail || err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -139,10 +148,8 @@ export const ExercisePage = () => {
           <Panel defaultSize="40" minSize="20" className="bg-gray-900 flex flex-col border-r border-gray-800">
             <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
               <h1 className="text-2xl font-bold text-white mb-6">{exercise.title}</h1>
-              <div 
-                className="prose prose-invert max-w-none text-gray-300 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: exercise.description }}
-              />
+              <div className="whitespace-pre-wrap text-gray-300 leading-relaxed">{exercise.description}</div>
+              {exercise.constraints && <div className="mt-6 whitespace-pre-wrap text-gray-400"><h2>Ràng buộc</h2>{exercise.constraints}</div>}
             </div>
           </Panel>
 
@@ -204,6 +211,7 @@ export const ExercisePage = () => {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                  {executionError && <p role="alert" className="text-red-400 mb-3">{executionError}</p>}
                   {activeTab === 'testcases' && (
                     <div className="space-y-4">
                       <div>

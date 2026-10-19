@@ -41,6 +41,8 @@ export function AdminSidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Props
         {personnelOpen && <div id={mobile ? 'mobile-personnel-menu' : 'desktop-personnel-menu'} className={collapsed ? 'mt-1' : 'ml-5 mt-1 border-l border-zinc-200 pl-2'}>
           {adminNavigation.slice(1).map(({ label, to }) => <Link key={to} to={to} onClick={onCloseMobile} title={label} aria-label={label} aria-current={location.pathname === to ? 'page' : undefined} className={`mb-1 flex min-h-[42px] items-center rounded-lg p-2.5 text-xs text-neutral-600 hover:bg-zinc-200 ${collapsed ? 'justify-center' : ''} ${location.pathname === to ? 'bg-zinc-200 font-semibold text-neutral-900' : ''}`}>{collapsed ? (to === '/admin/students' ? 'SV' : 'GV') : label}</Link>)}
         </div>}
+        <Link to="/admin/classes" onClick={onCloseMobile} className="mb-1 flex min-h-[42px] items-center gap-3 rounded-lg p-3 text-[13px] text-neutral-700 hover:bg-zinc-200" aria-current={location.pathname.startsWith('/admin/classes') ? 'page' : undefined}><GraduationCap size={18} />{!collapsed && 'Quản lý lớp học'}</Link>
+        <Link to="/manage/problems" onClick={onCloseMobile} className="mb-1 flex min-h-[42px] items-center gap-3 rounded-lg p-3 text-[13px] text-neutral-700 hover:bg-zinc-200"><LayoutDashboard size={18} />{!collapsed && 'Code Judge'}</Link>
       </nav>
       <div className={`flex min-h-21 items-center gap-[9px] ${collapsed ? 'justify-center' : ''}`}>
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#e8e3db] text-xs font-bold text-[#655947]" title={user?.fullName}>{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</span>

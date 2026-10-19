@@ -1,4 +1,4 @@
-import { axiosInstance } from '../../../lib/axios';
+import { axiosInstance, expireSession } from '../../../lib/axios';
 import type {
   LoginInput,
   RegisterStudentInput,
@@ -35,8 +35,7 @@ export const authApi = {
   },
 
   logout: async () => {
-    const response = await axiosInstance.post('/auth/logout');
-    return response.data;
+    await expireSession(false);
   },
 
   forgotPassword: async (data: ForgotPasswordInput) => {

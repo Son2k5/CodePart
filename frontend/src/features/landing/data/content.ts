@@ -31,10 +31,10 @@ export const workflowSteps = [
 ]
 
 export const learningPaths: LearningPath[] = [
-  { id: 'python', name: 'Nền tảng Python', mark: 'Py', category: 'foundation', level: 'Nhập môn', description: 'Bắt đầu với những dòng code đầu tiên và xây dựng tư duy giải quyết vấn đề.', topics: ['Biến & kiểu dữ liệu', 'Vòng lặp', 'Hàm'], tone: 'blue' },
-  { id: 'java', name: 'Lập trình Java', mark: 'Ja', category: 'foundation', level: 'Cơ sở', description: 'Nắm vững cú pháp và cách tổ chức chương trình qua từng bài thực hành.', topics: ['Cú pháp Java', 'Mảng & chuỗi', 'Xử lý ngoại lệ'], tone: 'yellow' },
-  { id: 'oop', name: 'Tư duy hướng đối tượng', mark: '{ }', category: 'advanced', level: 'Chuyên sâu', description: 'Biến yêu cầu thực tế thành các lớp, đối tượng và một thiết kế dễ mở rộng.', topics: ['Đóng gói', 'Kế thừa', 'Đa hình'], tone: 'green' },
-  { id: 'algorithms', name: 'Cấu trúc dữ liệu & giải thuật', mark: '++', category: 'advanced', level: 'Nâng cao', description: 'Rèn cách chọn cấu trúc dữ liệu và tìm lời giải hiệu quả cho mỗi bài toán.', topics: ['Tìm kiếm', 'Sắp xếp', 'Độ phức tạp'], tone: 'blue' },
+  { id: 'python', name: 'Nền tảng Python', mark: 'Py', category: 'foundation', level: 'Nhập môn', description: 'Bắt đầu với những dòng code đầu tiên và xây dựng tư duy giải quyết vấn đề.', tone: 'blue' },
+  { id: 'java', name: 'Lập trình Java', mark: 'Ja', category: 'foundation', level: 'Cơ sở', description: 'Nắm vững cú pháp và cách tổ chức chương trình qua từng bài thực hành.', tone: 'yellow' },
+  { id: 'oop', name: 'Tư duy hướng đối tượng', mark: '{ }', category: 'advanced', level: 'Chuyên sâu', description: 'Biến yêu cầu thực tế thành các lớp, đối tượng và một thiết kế dễ mở rộng.', tone: 'green' },
+  { id: 'algorithms', name: 'Cấu trúc dữ liệu & giải thuật', mark: '++', category: 'advanced', level: 'Nâng cao', description: 'Rèn cách chọn cấu trúc dữ liệu và tìm lời giải hiệu quả cho mỗi bài toán.', tone: 'blue' },
 ]
 
 export const faqs = [

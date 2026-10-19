@@ -1,5 +1,99 @@
 ### Health check
 
+# Teacher Portal P2 variables: teacherAccessToken, studentAccessToken, courseId, submissionId, joinCode
+
+### My teaching courses
+GET {{host}}/api/teacher/courses
+Authorization: Bearer {{teacherAccessToken}}
+
+### Create course (Draft)
+POST {{host}}/api/teacher/courses
+Authorization: Bearer {{teacherAccessToken}}
+Content-Type: application/json
+
+{ "subjectName": "Algorithms", "sectionCode": "ITEC-2026-01", "language": "python", "semester": "HK1-2026", "capacity": 60 }
+
+### Course details and join code
+GET {{host}}/api/teacher/courses/{{courseId}}
+Authorization: Bearer {{teacherAccessToken}}
+
+### Open course (use Closed to close)
+PUT {{host}}/api/teacher/courses/{{courseId}}/status
+Authorization: Bearer {{teacherAccessToken}}
+Content-Type: application/json
+
+{ "status": "Active" }
+
+### Add student
+POST {{host}}/api/teacher/courses/{{courseId}}/students
+Authorization: Bearer {{teacherAccessToken}}
+Content-Type: application/json
+
+{ "email": "student@hanu.edu.vn" }
+
+### Student joins using code
+POST {{host}}/api/student/courses/join
+Authorization: Bearer {{studentAccessToken}}
+Content-Type: application/json
+
+{ "joinCode": "{{joinCode}}" }
+
+### Student courses
+GET {{host}}/api/student/courses
+Authorization: Bearer {{studentAccessToken}}
+
+### Course roster
+GET {{host}}/api/teacher/courses/{{courseId}}/students
+Authorization: Bearer {{teacherAccessToken}}
+
+### Drop enrollment (preserve submissions)
+DELETE {{host}}/api/teacher/courses/{{courseId}}/students/{{userId}}
+Authorization: Bearer {{teacherAccessToken}}
+
+### Assign an exercise with sample and hidden tests
+POST {{host}}/api/teacher/courses/{{courseId}}/exercises
+Authorization: Bearer {{teacherAccessToken}}
+Content-Type: application/json
+
+{
+  "title": "Echo input", "difficulty": "Easy", "description": "Read one line and print it.",
+  "constraints": "Input length <= 1000", "starterCode": "print(input())",
+  "timeLimitMs": 1000, "memoryLimitKb": 65536,
+  "testCases": [
+    { "input": "hello", "expectedOutput": "hello", "isSample": true, "explanation": "Echo the same line" },
+    { "input": "hidden", "expectedOutput": "hidden", "isSample": false, "explanation": null }
+  ]
+}
+
+### Assigned exercises (student)
+GET {{host}}/api/student/courses/{{courseId}}/exercises
+Authorization: Bearer {{studentAccessToken}}
+
+### Course submissions
+GET {{host}}/api/teacher/courses/{{courseId}}/submissions?page=1&pageSize=20
+Authorization: Bearer {{teacherAccessToken}}
+
+### Source and test results
+GET {{host}}/api/teacher/courses/{{courseId}}/submissions/{{submissionId}}
+Authorization: Bearer {{teacherAccessToken}}
+
+### Manual grading
+PUT {{host}}/api/teacher/courses/{{courseId}}/submissions/{{submissionId}}/grade
+Authorization: Bearer {{teacherAccessToken}}
+Content-Type: application/json
+
+{ "score": 8.25, "feedback": "Good solution. Explain the complexity." }
+
+### Managed academic classes
+GET {{host}}/api/teacher/classes
+Authorization: Bearer {{teacherAccessToken}}
+
+### Academic class students (replace classId)
+GET {{host}}/api/teacher/classes/{{classId}}/students
+Authorization: Bearer {{teacherAccessToken}}
+
+### Health check
+
 GET {{host}}/health
 Accept: application/json
 
@@ -41,9 +135,78 @@ Accept: application/json
 
 ### List pending teachers (AdminOnly)
 
+# Explicit cursor/limit retains the legacy contract. Omit both for offset pagination.
+
 GET {{host}}/api/admin/teachers?status=Pending&limit=20
 Authorization: Bearer {{adminAccessToken}}
 Accept: application/json
+
+### Search teachers with offset pagination (optional facultyId GUID)
+GET {{host}}/api/admin/teachers?page=1&pageSize=20&search=GV&sortBy=name_asc&status=Active
+Authorization: Bearer {{adminAccessToken}}
+
+### Teacher KPI
+GET {{host}}/api/admin/teachers/stats
+Authorization: Bearer {{adminAccessToken}}
+
+### Faculties for the teacher form
+GET {{host}}/api/admin/faculties
+Authorization: Bearer {{adminAccessToken}}
+
+### Teacher profile and assignments
+GET {{host}}/api/admin/teachers/{{userId}}
+Authorization: Bearer {{adminAccessToken}}
+
+### Create a verified teacher (replace temporary password before use)
+POST {{host}}/api/admin/teachers
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Test Teacher",
+  "email": "test.teacher@hanu.edu.vn",
+  "teacherId": "GV-TEST-001",
+  "facultyId": null,
+  "phone": "0901234567",
+  "bio": "Software Engineering",
+  "temporaryPassword": "ReplaceWithSecurePassword1!",
+  "status": "Active"
+}
+
+### Update teacher profile (status changes use workflow endpoints)
+PUT {{host}}/api/admin/teachers/{{userId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Updated Teacher",
+  "teacherId": "GV-TEST-001",
+  "facultyId": null,
+  "phone": "0901234567",
+  "bio": "Updated profile"
+}
+
+### Enable a disabled account; older tokens remain invalid
+POST {{host}}/api/admin/users/{{userId}}/enable
+Authorization: Bearer {{adminAccessToken}}
+
+### Approve a selection atomically (1 to 100 distinct verified pending teachers)
+POST {{host}}/api/admin/teachers/bulk-approve
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "userIds": ["{{userId}}"] }
+
+### Disable a selection atomically (active teachers only)
+POST {{host}}/api/admin/teachers/bulk-disable
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{ "userIds": ["{{userId}}"] }
+
+### Export ALL matching teachers, independent of the visible page
+GET {{host}}/api/admin/teachers/export?status=Active&sortBy=name_asc
+Authorization: Bearer {{adminAccessToken}}
 
 ### Approve a pending teacher (AdminOnly)
 

@@ -5,7 +5,7 @@ using MediatR;
 
 namespace CodePath.Application.Exercises.Queries;
 
-public sealed record GetExerciseQuery(string Slug) : IRequest<Result<ExerciseDto>>;
+public sealed record GetExerciseQuery(string Slug, Guid? UserId = null) : IRequest<Result<ExerciseDto>>;
 
 internal sealed class GetExerciseQueryHandler(IExerciseDbContext dbContext)
     : IRequestHandler<GetExerciseQuery, Result<ExerciseDto>>
@@ -15,7 +15,7 @@ internal sealed class GetExerciseQueryHandler(IExerciseDbContext dbContext)
     public async Task<Result<ExerciseDto>> Handle(GetExerciseQuery request, CancellationToken cancellationToken)
     {
         var exercise = await dbContext.GetPublishedBySlugAsync(request.Slug.Trim().ToLowerInvariant(), cancellationToken);
-        if (exercise is null)
+        if (exercise is null || (exercise.CourseId.HasValue && !await dbContext.CanAccessCourseExerciseAsync(exercise.CourseId.Value, request.UserId, false, cancellationToken)))
             return Result<ExerciseDto>.Failure("Exercise was not found.", ErrorCodes.NotFound);
 
         var samples = exercise.TestCases
@@ -34,7 +34,7 @@ internal sealed class GetExerciseQueryHandler(IExerciseDbContext dbContext)
             exercise.StarterCode,
             exercise.TimeLimitMs,
             exercise.MemoryLimitKb,
-            Languages,
+            exercise.Course is null ? Languages : new[] { exercise.Course.Language }.Concat(Languages.Where(l => l != exercise.Course.Language)).ToArray(),
             samples));
     }
 }

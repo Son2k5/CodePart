@@ -19,6 +19,8 @@ import { UserRoleBadge } from './UserRoleBadge';
 import { UserStatusBadge } from './UserStatusBadge';
 
 interface UserDetailModalProps {
+  busy?: boolean;
+  detailError?: string;
   user: AdminUserItem | null;
   onClose: () => void;
   onApproveTeacher: (user: AdminUserItem) => void;
@@ -28,6 +30,8 @@ interface UserDetailModalProps {
 
 export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   user,
+  busy = false,
+  detailError,
   onClose,
   onApproveTeacher,
   onRejectTeacher,
@@ -84,6 +88,8 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6">
+          {busy && <p role="status" className="text-xs">Đang xử lý…</p>}
+          {detailError && <p role="alert" className="text-xs text-rose-700">{detailError}</p>}
           {/* Status Alert for Pending Teacher */}
           {user.role === 'Teacher' && user.status === 'Pending' && (
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
@@ -93,15 +99,16 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                   Hồ sơ giáo viên đang chờ xét duyệt
                 </div>
                 <p className="text-amber-800">
-                  Giảng viên này đã hoàn tất đăng ký bằng email nhà trường và xác thực OTP.
+                  {user.emailVerifiedAt ? 'Email nhà trường đã được xác thực.' : 'Giáo viên chưa xác thực email; chưa thể phê duyệt.'}
                   Vui lòng kiểm tra thông tin và nhấn duyệt để cấp quyền giảng dạy.
                 </p>
                 <div className="pt-2 flex items-center gap-2">
                   <button
                     type="button"
+                    disabled={busy || !user.emailVerifiedAt}
                     onClick={() => {
                       onApproveTeacher(user);
-                      onClose();
+
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-xs cursor-pointer transition-colors"
                   >
@@ -110,9 +117,10 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                   </button>
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => {
                       onRejectTeacher(user);
-                      onClose();
+
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium shadow-xs cursor-pointer transition-colors"
                   >
@@ -135,7 +143,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                 <div>
                   <div className="text-slate-400 text-[11px]">Đơn vị / Khoa phụ trách</div>
                   <div className="font-medium text-slate-800 mt-0.5">
-                    {user.department || 'Khoa Công nghệ Thông tin'}
+                    {user.department || 'Chưa phân khoa'}
                   </div>
                 </div>
               </div>
@@ -155,7 +163,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                 <div>
                   <div className="text-slate-400 text-[11px]">Số điện thoại liên hệ</div>
                   <div className="font-medium text-slate-800 mt-0.5">
-                    {user.phone || '098*******'}
+                    {user.phone || 'Chưa cập nhật'}
                   </div>
                 </div>
               </div>
@@ -224,6 +232,14 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             </div>
           </div>
 
+          {user.managedClasses && <section className="text-xs space-y-2">
+            <h4 className="font-semibold">Lớp niên khóa phụ trách</h4>
+            {user.managedClasses.length ? user.managedClasses.map(c => <p key={c.id}>{c.name} · {c.academicYear} · {c.studentCount} sinh viên</p>) : <p>Chưa được phân công.</p>}
+          </section>}
+          {user.teachingCourses && <section className="text-xs space-y-2">
+            <h4 className="font-semibold">Học phần giảng dạy</h4>
+            {user.teachingCourses.length ? user.teachingCourses.map(c => <p key={c.id}>{c.subjectName} ({c.sectionCode}) · {c.semester} · {c.enrolledCount}/{c.capacity} sinh viên</p>) : <p>Chưa được phân công.</p>}
+          </section>}
           {/* Bio / Notes */}
           {user.bio && (
             <div>
@@ -240,12 +256,13 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
         {/* Footer Actions */}
         <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 shrink-0">
           <div>
-            {user.role !== 'Admin' && (
+            {user.role !== 'Admin' && (user.status === 'Active' || user.status === 'Disabled') && (
               <button
                 type="button"
+                disabled={busy}
                 onClick={() => {
                   onToggleStatus(user);
-                  onClose();
+
                 }}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   user.status === 'Disabled'

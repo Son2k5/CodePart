@@ -9,6 +9,7 @@ public sealed class ExerciseConfiguration : IEntityTypeConfiguration<Exercise>
     public void Configure(EntityTypeBuilder<Exercise> builder)
     {
         builder.ToTable("exercises");
+        builder.HasOne(e => e.Course).WithMany().HasForeignKey(e => e.CourseId).OnDelete(DeleteBehavior.Restrict);
         builder.HasKey(exercise => exercise.Id);
         builder.Property(exercise => exercise.Id).ValueGeneratedNever();
         builder.Property(exercise => exercise.Slug).HasMaxLength(160).IsRequired();

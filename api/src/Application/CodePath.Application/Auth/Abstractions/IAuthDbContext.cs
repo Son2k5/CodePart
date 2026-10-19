@@ -8,6 +8,9 @@ namespace CodePath.Application.Auth.Abstractions;
 /// </summary>
 public interface IAuthDbContext
 {
+    Task<RefreshToken?> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken = default);
+    Task<int> TouchSessionAsync(Guid sessionId, DateTime now, DateTime idleCutoff, DateTime throttleCutoff, CancellationToken cancellationToken = default);
+    Task<int> RevokeSessionAsync(Guid sessionId, DateTime now, string reason, CancellationToken cancellationToken = default);
     Task<RefreshToken?> GetRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken = default);
     Task AddRefreshTokenAsync(RefreshToken token, CancellationToken cancellationToken = default);
     Task<bool> TryRotateRefreshTokenAsync(string currentTokenHash, RefreshToken replacement, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);

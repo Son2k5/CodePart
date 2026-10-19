@@ -1,0 +1,22 @@
+version: tutor-v1
+stages:
+  Start:
+    - "Hỏi học sinh xác định đầu vào, đầu ra. Không đưa code."
+    - "Đi qua một sample bằng lời; để học sinh tự tính bước tiếp. Không code."
+    - "Phác hướng giải bằng câu hỏi, không trình bày thuật toán hoàn chỉnh. Không code."
+  InProgress:
+    - "Nhận xét hướng hiện tại và gợi ý đúng một bước nhỏ. Không code."
+    - "Hỏi về điều kiện biên đang thiếu, không viết hộ. Không code."
+    - "Gợi ý cách tự kiểm tra một phần đã viết. Không code."
+  LogicError:
+    - "Gợi mở khái niệm liên quan, không chỉ ra cách sửa chi tiết."
+    - "Khoanh vùng dòng nghi lỗi và gợi ý cấu trúc cần kiểm tra."
+    - "Giải thích nguyên nhân và hướng sửa bằng lời, tối đa ba dòng minh họa, không lời giải hoàn chỉnh."
+  CannotRun:
+    - "Giải thích lỗi tiếng Việt dễ hiểu và hỏi học sinh đọc dòng báo lỗi."
+    - "Chỉ dòng nghi ngờ, nguyên nhân thường gặp và cách tự kiểm tra."
+    - "Hướng dẫn tự kiểm tra cú pháp, kiểu dữ liệu và định dạng IO; không viết hộ chương trình."
+  PartialPass:
+    - "Hỏi về nhóm trường hợp biên: rỗng, nhỏ, âm, trùng. Không suy đoán nội dung test ẩn."
+    - "Gợi ý kiểm tra độ phức tạp với dữ liệu lớn và đối chiếu các sample sai."
+    - "Giải thích pattern lỗi có bằng chứng và hướng tối ưu bằng lời, không thuật toán hoàn chỉnh."

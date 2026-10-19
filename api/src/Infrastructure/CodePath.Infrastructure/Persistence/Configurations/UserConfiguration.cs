@@ -10,6 +10,10 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.ToTable("users");
+        builder.Property(u => u.TeacherId).HasMaxLength(50).HasColumnType("varchar(50)");
+        builder.HasIndex(u => u.TeacherId).IsUnique().HasDatabaseName("ux_users_teacher_id");
+        builder.Property(u => u.PhoneNumber).HasMaxLength(20).HasColumnType("varchar(20)");
+        builder.Property(u => u.Bio).HasMaxLength(1000).HasColumnType("varchar(1000)");
 
         // Primary Key
         builder.HasKey(u => u.Id);

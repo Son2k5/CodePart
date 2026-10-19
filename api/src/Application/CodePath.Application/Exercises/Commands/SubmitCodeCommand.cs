@@ -39,7 +39,7 @@ internal sealed class SubmitCodeCommandHandler(
             return Result<ExecutionResultDto>.Failure("The selected language is not supported.");
 
         var exercise = await dbContext.GetPublishedByIdAsync(request.ExerciseId, cancellationToken);
-        if (exercise is null)
+        if (exercise is null || (exercise.CourseId.HasValue && !await dbContext.CanAccessCourseExerciseAsync(exercise.CourseId.Value, request.StudentId, true, cancellationToken)))
             return Result<ExecutionResultDto>.Failure("Exercise was not found.", ErrorCodes.NotFound);
 
         if (exercise.TestCases.Count > MaximumTestCasesPerSubmission)

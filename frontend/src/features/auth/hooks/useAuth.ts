@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { AUTH_MESSAGES } from '../../../constants/messages';
 import { toast } from 'sonner';
+import { recordActivity, markSessionEnded } from '../sessionActivity';
 
 const getErrorMessage = (error: any) => {
   return error.response?.data?.detail || error.response?.data?.message || error.message || 'Đã có lỗi xảy ra';
@@ -16,6 +17,7 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: authApi.login,
     onSuccess: (data) => {
+      recordActivity();
       setAuth(data.user, data.accessToken);
       toast.success(AUTH_MESSAGES.LOGIN_SUCCESS);
       
@@ -135,12 +137,14 @@ export const useLogout = () => {
     mutationFn: authApi.logout,
     onSuccess: () => {
       clearAuth();
+      markSessionEnded();
       toast.success(AUTH_MESSAGES.LOGOUT_SUCCESS);
       navigate('/login');
     },
     onError: () => {
       // Even if API fails, clear local state
       clearAuth();
+      markSessionEnded();
       navigate('/login');
     },
   });

@@ -4,14 +4,12 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace CodePath.Shared.Web.Exceptions;
 
 public sealed class GlobalExceptionHandler(
-    ILogger<GlobalExceptionHandler> logger,
-    IHostEnvironment env) : IExceptionHandler
+    ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
@@ -59,6 +57,9 @@ public sealed class GlobalExceptionHandler(
                 ForbiddenException => (StatusCodes.Status403Forbidden, "Truy cập bị từ chối"),
                 _ => appException.ErrorCode switch
                 {
+                    "TOPIC_LOCKED" or "NOT_ENROLLED" => (403, "Learning access denied"),
+            "CLASS_NOT_FOUND" or "ENROLLMENT_NOT_FOUND" => (404, "Không tìm thấy dữ liệu"),
+                    "CLASS_FULL" or "ALREADY_ENROLLED" or "CLASS_HAS_STUDENTS" or "CLASS_CONCURRENCY_CONFLICT" => (409, "Xung đột dữ liệu"),
                     ErrorCodes.NotFound => (StatusCodes.Status404NotFound, "Không tìm thấy dữ liệu"),
                     ErrorCodes.Conflict => (StatusCodes.Status409Conflict, "Xung đột dữ liệu"),
                     ErrorCodes.Unauthorized => (StatusCodes.Status401Unauthorized, "Không được phép truy cập"),
@@ -105,9 +106,7 @@ public sealed class GlobalExceptionHandler(
         {
             Status = StatusCodes.Status500InternalServerError,
             Title = "Đã có lỗi xảy ra ở máy chủ",
-            Detail = env.IsDevelopment()
-                ? exception.ToString()
-                : "Đã có lỗi xảy ra từ hệ thống máy chủ. Vui lòng liên hệ quản trị viên với mã traceId để được hỗ trợ.",
+            Detail = "Đã có lỗi xảy ra từ hệ thống máy chủ. Vui lòng liên hệ quản trị viên với mã traceId để được hỗ trợ.",
             Type = "https://httpstatuses.com/500",
             Instance = httpContext.Request.Path
         };

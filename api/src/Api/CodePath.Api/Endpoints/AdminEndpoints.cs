@@ -1,6 +1,7 @@
 using CodePath.Api.Extensions;
 using CodePath.Application.Admin.Commands;
 using CodePath.Application.Admin.Queries;
+using CodePath.Application.Admin.Dtos;
 using CodePath.Shared.Kernel.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -10,7 +11,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace CodePath.Api.Endpoints;
 
-public static class AdminEndpoints
+public static partial class AdminEndpoints
 {
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -18,13 +19,25 @@ public static class AdminEndpoints
             .WithTags("Admin")
             .RequireAuthorization("AdminOnly");
 
+        MapTeacherManagement(group);
+
         group.MapGet("/teachers", async (
             [FromQuery] UserStatus? status,
             [FromQuery] string? cursor,
             [FromQuery] int? limit,
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize,
+            [FromQuery] string? search,
+            [FromQuery] Guid? facultyId,
+            [FromQuery] string? sortBy,
             ISender sender,
             CancellationToken cancellationToken) =>
         {
+            if (cursor is null && limit is null)
+                return (await sender.Send(new GetTeachersPagedQuery(new TeacherFilter(
+                    page ?? 1, pageSize ?? 20, search, facultyId, status, sortBy ?? "created_desc")), cancellationToken)).ToHttpResult();
+            if (page.HasValue || pageSize.HasValue || search is not null || facultyId.HasValue || sortBy is not null)
+                return Results.Problem("Cursor pagination cannot be combined with offset pagination or search filters.", statusCode: 400);
             var result = await sender.Send(
                 new ListTeachersQuery(status, cursor, NormalizeLimit(limit)),
                 cancellationToken);

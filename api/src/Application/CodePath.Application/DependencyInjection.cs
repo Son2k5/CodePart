@@ -19,6 +19,8 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddScoped<AdminStatusChangeService>();
+        services.AddSingleton<CodePath.Application.Classes.JoinCodeGenerator>();
+        services.AddScoped<CodePath.Application.Auth.Services.SessionActivityService>();
 
         return services;
     }

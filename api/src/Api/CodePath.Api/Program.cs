@@ -1,3 +1,6 @@
+using CodePath.Infrastructure.Learning;
+using CodePath.Infrastructure.Ai;
+using CodePath.Infrastructure.Judge;
 using System.Text;
 using System.Threading.RateLimiting;
 using CodePath.Api.Authorization;
@@ -23,11 +26,18 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 40 * 1024 * 1024);
 
 if (builder.Environment.IsDevelopment())
 {
     Env.TraversePath().Load();
     builder.Configuration.AddEnvironmentVariables();
+}
+
+var configuredUrls = builder.Configuration["ASPNETCORE_URLS"] ?? builder.Configuration["urls"];
+if (!string.IsNullOrWhiteSpace(configuredUrls))
+{
+    builder.WebHost.UseUrls(configuredUrls.Split(';', StringSplitOptions.RemoveEmptyEntries));
 }
 
 // Docker/Kubernetes secrets are mounted as files. Normalize only trailing line
@@ -168,6 +178,8 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy("CanManageClassContent", p => p.RequireAuthenticatedUser().RequireRole("Admin", "Teacher").AddRequirements(new ActiveUserRequirement()));
+    options.AddPolicy("JudgeManager", p => p.RequireAuthenticatedUser().RequireRole("Admin", "Teacher").AddRequirements(new ActiveUserRequirement()));
     options.AddPolicy("ActiveUser", policy =>
         policy.Requirements.Add(new ActiveUserRequirement()));
 
@@ -233,6 +245,9 @@ var loginRateLimit = builder.Configuration
 
 builder.Services.AddRateLimiter(options =>
 {
+    options.AddPolicy("class-join-code", context => RateLimitPartition.GetSlidingWindowLimiter(
+        context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+        _ => new SlidingWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, cancellationToken) =>
     {
@@ -254,7 +269,7 @@ builder.Services.AddRateLimiter(options =>
             Type = "https://httpstatuses.com/429",
             Instance = context.HttpContext.Request.Path
         };
-        problem.Extensions["code"] = "RATE_LIMIT_EXCEEDED";
+        problem.Extensions["code"] = context.HttpContext.Request.Path.StartsWithSegments("/api/problems") ? "RATE_LIMITED" : "RATE_LIMIT_EXCEEDED";
         problem.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
 
         await context.HttpContext.Response.WriteAsJsonAsync(problem, cancellationToken);
@@ -338,13 +353,25 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
+builder.Services.AddRateLimiter(o => { foreach (var rule in new[] { ("judge-run", 10), ("judge-submit", 5) }) o.AddPolicy(rule.Item1, c => RateLimitPartition.GetSlidingWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => JudgeRateLimits.Options(rule.Item1 == "judge-submit"))); });
+builder.Services.AddRateLimiter(o => o.AddPolicy("learning-heartbeat", c => RateLimitPartition.GetFixedWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+builder.Services.AddRateLimiter(o => o.AddPolicy("learning-write", c => RateLimitPartition.GetFixedWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
+builder.Services.AddLearning(builder.Configuration);
+
+if (builder.Configuration.GetValue<bool>("Judge:Enabled")) builder.Services.AddCodeJudge(builder.Configuration);
+if (builder.Configuration.GetValue<bool>("Ai:Enabled"))
+{
+    if (!builder.Configuration.GetValue<bool>("Judge:Enabled")) throw new InvalidOperationException("AI requires Judge:Enabled.");
+    builder.Services.AddAiAssistant(builder.Configuration);
+    builder.Services.AddSignalR();
+}
 
 var app = builder.Build();
+if (args.Contains("--migrate-judge")) { using var scope = app.Services.CreateScope(); await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.MigrateAsync(scope.ServiceProvider.GetRequiredService<JudgeDbContext>().Database); return; }
 
-// Chỉ chạy migration và seed khi truyền cờ --migrate rõ ràng (ví dụ: dotnet run -- --migrate).
-// Mặc định dotnet run KHÔNG tự ý chạy migration để tránh ảnh hưởng DB.
+
 if (args.Contains("--migrate"))
 {
     await app.MigrateDatabasesAsync();
@@ -385,6 +412,7 @@ else
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+app.UseMiddleware<CodePath.Api.Middleware.SessionActivityMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 
@@ -410,12 +438,13 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         });
     }
 })
+.WithMetadata(new CodePath.Api.Middleware.SkipActivityTrackingAttribute())
 .RequireRateLimiting("health-rate-limit");
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false
-})
+}).WithMetadata(new CodePath.Api.Middleware.SkipActivityTrackingAttribute())
 .ExcludeFromDescription();
 
 app.MapGet("/health/redis", async (IRedisHealthProbe probe, IWebHostEnvironment env, CancellationToken ct) =>
@@ -443,11 +472,17 @@ app.MapGet("/health/redis", async (IRedisHealthProbe probe, IWebHostEnvironment 
 })
 .WithName("CheckRedisHealth")
 .WithTags("Health")
+.WithMetadata(new CodePath.Api.Middleware.SkipActivityTrackingAttribute())
 .RequireRateLimiting("health-rate-limit");
 
+if (builder.Configuration.GetValue<bool>("Ai:Enabled")) app.MapAiEndpoints();
 app.MapAuthEndpoints();
 app.MapAdminEndpoints();
 app.MapExerciseEndpoints();
+if (builder.Configuration.GetValue<bool>("Judge:Enabled")) app.MapJudgeEndpoints();
+app.MapTeacherEndpoints();
+app.MapClassEndpoints();
+app.MapLearningEndpoints();
 
 app.Run();
 

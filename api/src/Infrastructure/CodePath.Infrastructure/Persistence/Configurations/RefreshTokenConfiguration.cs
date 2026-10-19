@@ -15,6 +15,11 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.HasKey(r => r.Id);
         builder.Property(r => r.Id).ValueGeneratedNever();
 
+        builder.Property(r => r.SessionId).IsRequired();
+        builder.Property(r => r.LastActiveAt).HasColumnType("datetime(6)").IsRequired();
+        builder.Property(r => r.RevokedReason).HasMaxLength(64);
+        builder.HasIndex(r => new { r.SessionId, r.RevokedAt });
+
         // Columns & Constraints
         builder.Property(r => r.UserId)
             .IsRequired();

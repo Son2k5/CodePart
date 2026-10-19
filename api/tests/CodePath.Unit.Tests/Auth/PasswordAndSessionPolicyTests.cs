@@ -10,6 +10,14 @@ namespace CodePath.Unit.Tests.Auth;
 public sealed class PasswordAndSessionPolicyTests
 {
     [Fact]
+    public void AuthSessionPolicy_ShouldKeepSevenDayRefreshLifetimeByDefault()
+    {
+        var policy = new AuthSessionPolicy(Options.Create(new AuthSessionOptions()));
+        policy.RefreshTokenLifetime.Should().Be(TimeSpan.FromDays(7));
+        policy.RefreshTokenAbsoluteLifetime.Should().Be(TimeSpan.FromDays(7));
+    }
+
+    [Fact]
     public void BCryptHasher_ShouldDetectHashCreatedWithOlderWorkFactor()
     {
         var oldHasher = new BCryptPasswordHasher(Options.Create(new PasswordHashingOptions
@@ -31,11 +39,11 @@ public sealed class PasswordAndSessionPolicyTests
     {
         var policy = new AuthSessionPolicy(Options.Create(new AuthSessionOptions
         {
-            RefreshTokenLifetimeDays = 10,
-            RefreshTokenAbsoluteLifetimeDays = 30
+            RefreshTokenLifetimeDays = 7,
+            RefreshTokenAbsoluteLifetimeDays = 7
         }));
 
-        policy.RefreshTokenLifetime.Should().Be(TimeSpan.FromDays(10));
-        policy.RefreshTokenAbsoluteLifetime.Should().Be(TimeSpan.FromDays(30));
+        policy.RefreshTokenLifetime.Should().Be(TimeSpan.FromDays(7));
+        policy.RefreshTokenAbsoluteLifetime.Should().Be(TimeSpan.FromDays(7));
     }
 }

@@ -17,6 +17,9 @@ export interface AdminUserItem {
   coursesCount?: number;
   classesCount?: number;
   bio?: string;
+  facultyId?: string | null;
+  managedClasses?: { id: string; name: string; academicYear: string; studentCount: number }[];
+  teachingCourses?: { id: string; subjectName: string; sectionCode: string; semester: string; capacity: number; enrolledCount: number }[];
 }
 
 export type UserRoleFilter = 'ALL' | Role;

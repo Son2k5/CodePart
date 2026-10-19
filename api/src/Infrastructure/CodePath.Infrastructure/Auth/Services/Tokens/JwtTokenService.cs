@@ -26,7 +26,7 @@ public sealed class JwtTokenService : IJwtTokenService
         string email,
         UserRole role,
         UserStatus status,
-        long securityVersion = 1)
+        long securityVersion = 1, Guid? sessionId = null)
     {
         var secret = _options.SigningKey;
         var issuer = _options.Issuer;
@@ -45,6 +45,8 @@ public sealed class JwtTokenService : IJwtTokenService
             new("sv", securityVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        if (sessionId.HasValue) claims.Add(new Claim("sid", sessionId.Value.ToString()));
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {

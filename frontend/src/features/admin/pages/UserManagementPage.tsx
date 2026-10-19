@@ -8,6 +8,8 @@ import type { AdminUserItem } from '../types/admin.types';
 import { UserDetailModal } from '../components/UserDetailModal';
 import { UserFormModal } from '../components/UserFormModal';
 import '../styles/personnel.css';
+import { adminTeacherApi, teacherError, type TeacherFilter, type TeacherFormData } from '../api/adminTeacherApi';
+import { useTeachers, useTeacherStats, useTeacherDetail, useFaculties, useTeacherMutations, useDebouncedSearch } from '../hooks/useTeachers';
 
 type PersonnelRole = 'Student' | 'Teacher';
 type ColumnId = 'code' | 'name' | 'gender' | 'birthday' | 'email' | 'department' | 'classes' | 'courses' | 'created' | 'phone' | 'status';
@@ -49,7 +51,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const roleLabel = role === 'Student' ? 'sinh viên' : 'giáo viên';
   const initialUsers = useMemo(() => INITIAL_MOCK_USERS.filter((user) => user.role === role), [role]);
   const columns = useMemo(() => getColumns(role), [role]);
-  const [users, setUsers] = useState(() => initialUsers.map((user) => ({ ...user })));
+  const [mockUsers, setUsers] = useState(() => initialUsers.map((user) => ({ ...user })));
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [department, setDepartment] = useState('');
@@ -62,6 +64,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const [hiddenColumns, setHiddenColumns] = useState<ColumnId[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const changePage = (next: number) => { setPage(next); setSelectedIds([]); };
   const [pageSize, setPageSize] = useState(20);
   const [sort, setSort] = useState<{ id: ColumnId; direction: 1 | -1 } | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null);
@@ -71,9 +74,25 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const resizeRef = useRef<{ id: ColumnId; start: number; width: number; min: number } | null>(null);
   const panelTrigger = useRef<HTMLElement | null>(null);
-  const stats = useMemo(() => calculateMockStats(users), [users]);
+  const live = role === 'Teacher';
+  const search = useDebouncedSearch(query);
+  const filter: TeacherFilter = { page, pageSize, search, facultyId: department || undefined,
+    status: status === 'ALL' ? undefined : status as AdminUserItem['status'],
+    sortBy: sort?.id === 'name' ? (sort.direction === 1 ? 'name_asc' : 'name_desc') : sort?.id === 'created' && sort.direction === 1 ? 'created_asc' : 'created_desc' };
+  const teachers = useTeachers(filter, live);
+  const teacherStats = useTeacherStats(live);
+  const faculties = useFaculties(live);
+  const detail = useTeacherDetail(live ? selectedUser?.id : undefined);
+  const mutations = useTeacherMutations();
+  const users = live ? teachers.data?.items ?? [] : mockUsers;
+  const stats = live ? { totalUsers: teacherStats.data?.totalTeachers ?? 0,
+    activeUsers: teacherStats.data?.activeTeachers ?? 0, pendingApprovals: teacherStats.data?.pendingApprovals ?? 0,
+    disabledUsers: teacherStats.data?.disabledTeachers ?? 0 } : calculateMockStats(users);
+  const statusCount = (key: string) => live ? ({ Active: teacherStats.data?.activeTeachers,
+    Pending: teacherStats.data?.pendingApprovals, Disabled: teacherStats.data?.disabledTeachers,
+    Rejected: teacherStats.data?.rejectedTeachers }[key] ?? 0) : users.filter(u => u.status === key).length;
   const visibleColumns = columns.filter((column) => !hiddenColumns.includes(column.id));
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = live ? users : users.filter((user) => {
     const text = normalize([user.fullName, user.email, user.studentId, user.teacherId].join(' '));
     return (!query.trim() || text.includes(normalize(query.trim()))) && (!department || user.department === department) && (status === 'ALL' || user.status === status);
   }).sort((a, b) => {
@@ -81,10 +100,16 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     const first = valueFor(a, sort.id), second = valueFor(b, sort.id);
     return (typeof first === 'number' && typeof second === 'number' ? first - second : String(first).localeCompare(String(second), 'vi')) * sort.direction;
   });
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
+  const totalCount = live ? teachers.data?.totalCount ?? 0 : filteredUsers.length;
+  const totalPages = Math.max(1, live ? teachers.data?.totalPages ?? 1 : Math.ceil(totalCount / pageSize));
+  const currentPage = live ? page : Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
-  const pageUsers = filteredUsers.slice(start, start + pageSize);
+  const pageUsers = live ? users : filteredUsers.slice(start, start + pageSize);
+  useEffect(() => {
+    // Reconcile the current page after the server reports fewer matching records.
+    // eslint-disable-next-line react/set-state-in-effect
+    if (live && teachers.data && page > totalPages) setPage(totalPages);
+  }, [live, teachers.data, page, totalPages]);
   const pageSelected = pageUsers.filter((user) => selectedIds.includes(user.id)).length;
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = pageSelected > 0 && pageSelected < pageUsers.length;
@@ -99,7 +124,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   }, [panel]);
   const togglePanel = (next: Panel, trigger: HTMLElement) => { panelTrigger.current = trigger; setPanel((current) => current === next ? null : next); };
   const changeStatus = (next: string) => {
-    setStatus(next); setPage(1); setPanel(null); setSelectedIds([]);
+    setStatus(next); changePage(1); setPanel(null); setSelectedIds([]);
     setSearchParams(next === 'Pending' ? { tab: 'pending' } : next === 'Disabled' ? { tab: 'disabled' } : {}, { replace: true });
   };
   const resetFilters = () => { setQuery(''); setDepartment(''); changeStatus('ALL'); };
@@ -110,7 +135,11 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     rootRef.current?.classList.add('personnel-resizing');
   };
   const endResize = () => { resizeRef.current = null; rootRef.current?.classList.remove('personnel-resizing'); };
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    if (live) {
+      try { await adminTeacherApi.export(filter); } catch (error) { toast.error(teacherError(error)); }
+      return;
+    }
     const rows = selectedIds.length ? filteredUsers.filter((user) => selectedIds.includes(user.id)) : filteredUsers;
     const escape = (value: string | number) => `"${String(value).replace(/^[=+@-]/, "'$&").replace(/"/g, '""')}"`;
     const csv = [visibleColumns.map((column) => column.label), ...rows.map((user) => visibleColumns.map((column) => column.id === 'created' ? dateLabel(user.createdAt) : valueFor(user, column.id)))].map((row) => row.map(escape).join(',')).join('\r\n');
@@ -118,14 +147,41 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     const link = document.createElement('a'); link.href = url; link.download = `${role === 'Student' ? 'sinh-vien' : 'giao-vien'}.csv`; link.click(); URL.revokeObjectURL(url); setPanel(null);
   };
   const openCreate = () => { setEditingUser(null); setFormOpen(true); setPanel(null); };
-  const updateStatus = (user: AdminUserItem, next: AdminUserItem['status']) => {
+  const updateStatus = async (user: AdminUserItem, next: AdminUserItem['status']) => {
+    if (live) {
+      if (mutations.busy) return;
+      try {
+        await mutations.action.mutateAsync({ id: user.id, action: next === 'Rejected' ? 'reject' : next === 'Disabled' ? 'disable' : user.status === 'Disabled' ? 'enable' : 'approve' });
+        setSelectedUser(null); toast.success('Đã cập nhật trạng thái');
+      } catch (error) { toast.error(teacherError(error)); }
+      return;
+    }
     setUsers((current) => current.map((item) => item.id === user.id ? { ...item, status: next } : item));
     setSelectedUser((current) => current?.id === user.id ? { ...current, status: next } : current);
     toast.success('Đã cập nhật trạng thái trong bản xem thử');
   };
+  const saveUser = async (data: TeacherFormData) => {
+    if (live) {
+      if (editingUser) await mutations.update.mutateAsync({ id: editingUser.id, data });
+      else await mutations.create.mutateAsync(data);
+      toast.success('Đã lưu hồ sơ giáo viên');
+    } else {
+      if (editingUser) setUsers(current => current.map(user => user.id === editingUser.id ? { ...user, ...data, role } : user));
+      else setUsers(current => [{ ...data, id: crypto.randomUUID(), fullName: data.fullName || '', email: data.email || '', role, status: data.status || 'Active', createdAt: new Date().toISOString() }, ...current]);
+      toast.success('Đã lưu hồ sơ trong bản xem thử');
+    }
+  };
+  const bulkAction = async (action: 'approve' | 'disable') => {
+    try {
+      await mutations.bulk.mutateAsync({ ids: selectedIds, action });
+      setSelectedIds([]); toast.success('Đã cập nhật các giáo viên đã chọn');
+    } catch (error) { toast.error(teacherError(error)); }
+  };
 
   return (
     <div ref={rootRef} className="personnel-page">
+      {live && teachers.isPending && <p role="status">Đang tải danh sách giáo viên…</p>}
+      {live && (teachers.error || teacherStats.error || faculties.error || detail.error) && <p role="alert">{teacherError(teachers.error || teacherStats.error || faculties.error || detail.error)} <button onClick={() => { void teachers.refetch(); void teacherStats.refetch(); void faculties.refetch(); if (selectedUser) void detail.refetch(); }}>Thử lại</button></p>}
       {showNotice && (
         <div className="personnel-notice" role="status">
           <Megaphone size={16} />
@@ -157,11 +213,11 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
           {panel === 'scope' && (
             <div id="personnel-scope" className="personnel-popover personnel-popover-left">
               <button onClick={() => changeStatus('ALL')}>
-                Tất cả {roleLabel}<span>{users.length}</span>
+                Tất cả {roleLabel}<span>{stats.totalUsers}</span>
               </button>
               {Object.entries(statusLabels).map(([key, label]) => (
                 <button key={key} onClick={() => changeStatus(key)}>
-                  {label}<span>{users.filter((user) => user.status === key).length}</span>
+                  {label}<span>{statusCount(key)}</span>
                 </button>
               ))}
             </div>
@@ -225,8 +281,8 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                 <button onClick={() => { setWidths({}); setHiddenColumns([]); setPanel(null); }}>
                   Khôi phục các cột
                 </button>
-                <button onClick={() => { setUsers(initialUsers.map((user) => ({ ...user }))); setSelectedIds([]); setPanel(null); }}>
-                  Làm mới dữ liệu mẫu
+                <button onClick={() => { if (live) void teachers.refetch(); else setUsers(initialUsers.map((user) => ({ ...user }))); setSelectedIds([]); setPanel(null); }}>
+                  {live ? 'Làm mới dữ liệu' : 'Làm mới dữ liệu mẫu'}
                 </button>
               </div>
             )}
@@ -256,12 +312,12 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
             <Search size={14} />
             <input
               value={query}
-              onChange={(event) => { setQuery(event.target.value); setPage(1); setSelectedIds([]); }}
+              onChange={(event) => { setQuery(event.target.value); changePage(1); setSelectedIds([]); }}
               placeholder={`Tìm theo tên, email, mã ${roleLabel}...`}
               aria-label={`Tìm kiếm ${roleLabel}`}
             />
             {query && (
-              <button aria-label="Xóa tìm kiếm" onClick={() => { setQuery(''); setPage(1); }}>
+              <button aria-label="Xóa tìm kiếm" onClick={() => { setQuery(''); changePage(1); }}>
                 <X size={13} />
               </button>
             )}
@@ -270,13 +326,17 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
             <select
               value={department}
               aria-label="Lọc theo khoa hoặc đơn vị"
-              onChange={(event) => { setDepartment(event.target.value); setPage(1); setSelectedIds([]); }}
+              onChange={(event) => { setDepartment(event.target.value); changePage(1); setSelectedIds([]); }}
             >
               <option value="">Tất cả đơn vị / khoa</option>
-              {DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
+              {live ? faculties.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>) : DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
             </select>
             <ChevronDown size={14} />
           </div>
+          {live && selectedIds.length > 0 && <>
+            <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Pending' && u.emailVerifiedAt)} onClick={() => void bulkAction('approve')}>Duyệt đã chọn</button>
+            <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Active')} onClick={() => void bulkAction('disable')}>Khóa đã chọn</button>
+          </>}
           {selectedIds.length > 0 && (
             <button className="personnel-selection-badge" onClick={() => setSelectedIds([])}>
               Đã chọn {selectedIds.length}
@@ -305,7 +365,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                     onClick={() => changeStatus('ALL')}
                   >
                     <span>Tất cả trạng thái</span>
-                    <span>{users.length}</span>
+                    <span>{stats.totalUsers}</span>
                   </button>
                   {Object.entries(statusLabels).map(([key, label]) => (
                     <button
@@ -315,7 +375,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                       onClick={() => changeStatus(key)}
                     >
                       <span>{label}</span>
-                      <span>{users.filter((user) => user.status === key).length}</span>
+                      <span>{statusCount(key)}</span>
                     </button>
                   ))}
                 </div>
@@ -369,33 +429,33 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
           <table style={{ width: 48 + visibleColumns.reduce((total, column) => total + (widths[column.id] ?? column.width), 0) }}>
             <caption className="personnel-sr-only">Danh sách {roleLabel}. Kéo mép phải tiêu đề cột hoặc dùng phím mũi tên để thay đổi độ rộng.</caption>
             <colgroup><col style={{ width: 48 }} />{visibleColumns.map((column) => <col key={column.id} style={{ width: widths[column.id] ?? column.width }} />)}</colgroup>
-            <thead><tr><th className="personnel-checkbox-cell"><input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={pageUsers.length > 0 && pageSelected === pageUsers.length} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...pageUsers.map((user) => user.id)])] : current.filter((id) => !pageUsers.some((user) => user.id === id)))} /></th>{visibleColumns.map((column) => <th key={column.id} scope="col" aria-sort={sort?.id === column.id ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}><button className="personnel-column-title" onClick={() => { setPage(1); setSort((current) => ({ id: column.id, direction: current?.id === column.id && current.direction === 1 ? -1 : 1 })); }}><span>{column.label}</span>{sort?.id === column.id && <span>{sort.direction === 1 ? '↑' : '↓'}</span>}</button><span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${column.label}`} aria-orientation="vertical" aria-valuemin={column.min} aria-valuemax={600} aria-valuenow={widths[column.id] ?? column.width} tabIndex={0} onPointerDown={(event) => beginResize(event, column)} onPointerMove={(event) => { const resizing = resizeRef.current; if (resizing?.id === column.id) setWidths((current) => ({ ...current, [column.id]: Math.max(resizing.min, Math.min(600, resizing.width + event.clientX - resizing.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths((current) => ({ ...current, [column.id]: column.width }))} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setWidths((current) => ({ ...current, [column.id]: Math.max(column.min, Math.min(600, (current[column.id] ?? column.width) + (event.key === 'ArrowRight' ? 16 : -16))) })); } }} /></th>)}</tr></thead>
+            <thead><tr><th className="personnel-checkbox-cell"><input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={pageUsers.length > 0 && pageSelected === pageUsers.length} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...pageUsers.map((user) => user.id)])] : current.filter((id) => !pageUsers.some((user) => user.id === id)))} /></th>{visibleColumns.map((column) => <th key={column.id} scope="col" aria-sort={sort?.id === column.id ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}><button className="personnel-column-title" disabled={live && column.id !== 'name' && column.id !== 'created'} onClick={() => { changePage(1); setSort((current) => ({ id: column.id, direction: current?.id === column.id && current.direction === 1 ? -1 : 1 })); }}><span>{column.label}</span>{sort?.id === column.id && <span>{sort.direction === 1 ? '↑' : '↓'}</span>}</button><span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${column.label}`} aria-orientation="vertical" aria-valuemin={column.min} aria-valuemax={600} aria-valuenow={widths[column.id] ?? column.width} tabIndex={0} onPointerDown={(event) => beginResize(event, column)} onPointerMove={(event) => { const resizing = resizeRef.current; if (resizing?.id === column.id) setWidths((current) => ({ ...current, [column.id]: Math.max(resizing.min, Math.min(600, resizing.width + event.clientX - resizing.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths((current) => ({ ...current, [column.id]: column.width }))} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setWidths((current) => ({ ...current, [column.id]: Math.max(column.min, Math.min(600, (current[column.id] ?? column.width) + (event.key === 'ArrowRight' ? 16 : -16))) })); } }} /></th>)}</tr></thead>
             <tbody>{pageUsers.map((user, index) => <tr key={user.id} className={selectedIds.includes(user.id) ? 'is-selected' : ''} onDoubleClick={() => { setEditingUser(user); setFormOpen(true); }}><td className="personnel-checkbox-cell"><input type="checkbox" aria-label={`Chọn ${user.fullName}`} checked={selectedIds.includes(user.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} /></td>{visibleColumns.map((column) => <td key={column.id} title={String(valueFor(user, column.id))}>{column.id === 'name' ? <button className="personnel-name" onClick={() => setSelectedUser(user)}><span className="personnel-avatar" style={{ background: avatarColors[(start + index) % avatarColors.length] }}>{user.fullName.split(' ').slice(-2).map((part) => part.charAt(0)).join('')}</span><span>{user.fullName}</span></button> : column.id === 'email' ? <a className="personnel-email" href={`mailto:${user.email}`}>{user.email}</a> : column.id === 'status' ? <span className={`personnel-status status-${user.status}`}><i /><span>{statusLabels[user.status]}</span></span> : column.id === 'created' ? dateLabel(user.createdAt) : valueFor(user, column.id) || (typeof valueFor(user, column.id) === 'number' ? 0 : '–')}</td>)}</tr>)}</tbody>
           </table>
-          {!filteredUsers.length && <div className="personnel-empty"><Search size={28} /><strong>Không tìm thấy {roleLabel}</strong><p>Thử từ khóa khác hoặc đặt lại bộ lọc.</p><button onClick={resetFilters}>Đặt lại bộ lọc</button></div>}
+          {!filteredUsers.length && !(live && (teachers.isPending || teachers.isError)) && <div className="personnel-empty"><Search size={28} /><strong>Không tìm thấy {roleLabel}</strong><p>Thử từ khóa khác hoặc đặt lại bộ lọc.</p><button onClick={resetFilters}>Đặt lại bộ lọc</button></div>}
         </div>
 
         <footer className="personnel-pagination">
-          <span>Tổng số: <strong>{filteredUsers.length}</strong> {roleLabel}</span>
+          <span>Tổng số: <strong>{totalCount}</strong> {roleLabel}</span>
           <div>
             <label htmlFor="personnel-page-size">Số dòng/trang</label>
             <div className="personnel-select">
-              <select id="personnel-page-size" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }}>
+              <select id="personnel-page-size" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); changePage(1); }}>
                 {[5, 10, 20, 50, 100].map((size) => <option key={size}>{size}</option>)}
               </select>
               <ChevronDown size={12} />
             </div>
-            <strong aria-live="polite">{filteredUsers.length ? start + 1 : 0}–{Math.min(start + pageSize, filteredUsers.length)}</strong>
-            <button type="button" className="personnel-icon" aria-label="Trang đầu" disabled={currentPage === 1} onClick={() => setPage(1)}><ChevronsLeft size={14} /></button>
-            <button type="button" className="personnel-icon" aria-label="Trang trước" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={14} /></button>
-            <button type="button" className="personnel-icon" aria-label="Trang sau" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}><ChevronRight size={14} /></button>
-            <button type="button" className="personnel-icon" aria-label="Trang cuối" disabled={currentPage === totalPages} onClick={() => setPage(totalPages)}><ChevronsRight size={14} /></button>
+            <strong aria-live="polite">{totalCount ? start + 1 : 0}–{Math.min(start + pageSize, totalCount)}</strong>
+            <button type="button" className="personnel-icon" aria-label="Trang đầu" disabled={currentPage === 1} onClick={() => changePage(1)}><ChevronsLeft size={14} /></button>
+            <button type="button" className="personnel-icon" aria-label="Trang trước" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}><ChevronLeft size={14} /></button>
+            <button type="button" className="personnel-icon" aria-label="Trang sau" disabled={currentPage === totalPages} onClick={() => changePage(currentPage + 1)}><ChevronRight size={14} /></button>
+            <button type="button" className="personnel-icon" aria-label="Trang cuối" disabled={currentPage === totalPages} onClick={() => changePage(totalPages)}><ChevronsRight size={14} /></button>
           </div>
         </footer>
       </section>
 
-      <UserDetailModal user={selectedUser} onClose={() => setSelectedUser(null)} onApproveTeacher={(user) => updateStatus(user, 'Active')} onRejectTeacher={(user) => updateStatus(user, 'Rejected')} onToggleStatus={(user) => updateStatus(user, user.status === 'Disabled' ? 'Active' : 'Disabled')} />
-      <UserFormModal fixedRole={role} isOpen={formOpen} initialData={editingUser} onClose={() => { setFormOpen(false); setEditingUser(null); }} onSubmit={(data) => { if (editingUser) setUsers((current) => current.map((user) => user.id === editingUser.id ? { ...user, ...data, role } : user)); else setUsers((current) => [{ ...data, id: crypto.randomUUID(), fullName: data.fullName || '', email: data.email || '', role, status: data.status || 'Active', createdAt: new Date().toISOString(), lastLoginAt: null }, ...current]); toast.success('Đã lưu hồ sơ trong bản xem thử'); }} />
+      <UserDetailModal detailError={live && detail.error ? teacherError(detail.error) : undefined} busy={mutations.busy || (live && detail.isFetching)} user={live ? (selectedUser ? detail.data ?? selectedUser : null) : selectedUser} onClose={() => setSelectedUser(null)} onApproveTeacher={(user) => updateStatus(user, 'Active')} onRejectTeacher={(user) => updateStatus(user, 'Rejected')} onToggleStatus={(user) => updateStatus(user, user.status === 'Disabled' ? 'Active' : 'Disabled')} />
+      <UserFormModal fixedRole={role} faculties={live ? faculties.data ?? [] : undefined} isOpen={formOpen} initialData={editingUser} onClose={() => { setFormOpen(false); setEditingUser(null); }} onSubmit={saveUser} />
     </div>
   );
 }

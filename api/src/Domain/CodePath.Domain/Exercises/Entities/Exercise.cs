@@ -5,6 +5,17 @@ namespace CodePath.Domain.Exercises.Entities;
 
 public sealed class Exercise : BaseEntity
 {
+    public Guid? CourseId { get; private set; }
+    public CodePath.Domain.Users.Entities.Course? Course { get; private set; }
+
+    public void AssignToCourse(Guid courseId, DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (courseId == Guid.Empty || CourseId.HasValue || IsPublished)
+            throw new DomainRuleViolationException("Assign a new, unpublished exercise to a course only once.");
+        CourseId = courseId;
+        Touch(utcNow);
+    }
     public string Slug { get; private set; } = default!;
     public string Title { get; private set; } = default!;
     public string Difficulty { get; private set; } = default!;

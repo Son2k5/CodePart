@@ -1,20 +1,111 @@
+# Development only. .NET, Vite and MySQL run on the host.
+# Redis: docker compose up -d
+# AI:    docker compose --profile ai up -d --build
+# RAG:   docker compose --profile rag up -d --build (includes AI)
+# Production uses docker-compose.production.yml ALONE, never as an overlay.
+x-rag-environment: &rag-environment
+  QDRANT_URL: http://qdrant:6333
+  QDRANT_API_KEY: ${QDRANT_API_KEY:-codepath-local-qdrant-only}
+  EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+  EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+  EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+  RAG_MIN_SCORE: ${RAG_MIN_SCORE:-0.35}
+  RAG_ASSET_HOSTS: ${RAG_ASSET_HOSTS:-api.cloudinary.com,res.cloudinary.com}
+
+x-python-service: &python-service
+  build:
+    context: ../ai-service
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  extra_hosts:
+    - host.docker.internal:host-gateway
+  pids_limit: 100
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+    interval: 15s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+
 services:
   redis:
     image: redis:7-alpine
     container_name: codepath-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - codepath-redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - ping
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
 
+  ai-service:
+    <<: *python-service
+    profiles: [ai, rag]
+    cpus: 1.0
+    mem_limit: 768m
+    environment:
+      <<: *rag-environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      SERVICE_API_KEY: ${AI_SERVICE_KEY:-${Ai__ServiceKey:-codepath-development-service-key-only}}
+      REDIS_URL: redis://redis:6379/0
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_ADVANCED_MODEL: ${LLM_ADVANCED_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+    ports:
+      - "127.0.0.1:${AI_PORT:-8000}:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ai-indexer:
+    <<: *python-service
+    profiles: [rag]
+    cpus: 1.0
+    mem_limit: 1g
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --limit-concurrency, "4"]
+    environment:
+      <<: *rag-environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      SERVICE_API_KEY: ${AI_SERVICE_KEY:-${Ai__ServiceKey:-codepath-development-service-key-only}}
+    ports:
+      - "127.0.0.1:${AI_INDEXER_PORT:-8001}:8000"
+    depends_on:
+      qdrant:
+        condition: service_started
+
+  qdrant:
+    image: qdrant/qdrant:v1.17.1
+    profiles: [rag]
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-codepath-local-qdrant-only}
+    ports:
+      - "127.0.0.1:${QDRANT_PORT:-6333}:6333"
+    volumes:
+      - qdrant-local-data:/qdrant/storage
+
 volumes:
   codepath-redis-data:
+  qdrant-local-data:
 

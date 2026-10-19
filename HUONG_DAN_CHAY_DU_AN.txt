@@ -5,6 +5,8 @@ Các lệnh dưới đây chạy trong PowerShell.
 
 - Cài .NET SDK hỗ trợ .NET 8, Node.js và npm.
 - Bật MySQL local và Docker Desktop (Linux containers) để chạy Redis.
+- Không chạy MySQL/PostgreSQL bằng Docker. Hai container database kiểm thử đã được gỡ bỏ; dữ liệu MySQL local được giữ nguyên.
+- Code Judge: Run/Submit cần dịch vụ Judge0 riêng. Chưa cấu hình dịch vụ này thì giữ Judge__Enabled=false; xem api/docs/ARCHITECTURE.md.
 - Cấu hình api/.env theo api/.env.example nếu chưa có; không ghi đè file hiện có.
 - Để trống VITE_API_BASE_URL để frontend gọi /api qua proxy cùng origin.
 - Nếu api/.env có AuthFrontend__PublicBaseUrl hoặc Cors__AllowedOrigins__*,
@@ -29,7 +31,7 @@ Terminal 1 - Redis và backend:
 
 cd D:\KLTN\CodePart\api
 docker compose up -d redis
-dotnet run  --launch -profile https --project src/Api/CodePath.Api/CodePath.Api.csproj
+dotnet run --launch-profile https --project src/Api/CodePath.Api/CodePath.Api.csproj
 
 Terminal 2 - frontend:
 
@@ -39,6 +41,20 @@ npm run dev
 
 npm ci dùng khi cài lần đầu hoặc package-lock.json thay đổi.
 Những lần sau chỉ cần npm run dev.
+
+Compose development chỉ dùng api/docker-compose.yml. Backend, frontend và MySQL
+vẫn chạy trên máy như trên. Khi cần dịch vụ AI/RAG trong Docker:
+
+# Trong terminal api, sau khi điền biến tương ứng trong .env:
+docker compose --profile ai up -d --build
+# Hoặc bật cả AI + Qdrant + indexer:
+docker compose --profile rag up -d --build
+
+AI: http://127.0.0.1:8000; indexer: http://127.0.0.1:8001;
+Qdrant: http://127.0.0.1:6333. Các cổng chỉ bind localhost.
+Đặt Ai__Enabled=true; nếu dùng RAG đặt thêm Rag__Enabled=true trong api/.env.
+Ai__ServiceKey phải trùng khóa SERVICE_API_KEY trong container.
+LLM/embedding phải được cấu hình trước khi sử dụng; xem api/docs/COMPOSE.md.
 
 Frontend: https://localhost:5173
 Swagger: https://localhost:5001/swagger
@@ -88,8 +104,14 @@ Cert localhost ở mục 2 không thay thế cert domain production.
 Sau khi chuẩn bị đầy đủ:
 
 cd D:\KLTN\CodePart\api
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml config --quiet
-docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.production.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
+docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+
+Production dùng file độc lập, KHÔNG ghép thêm docker-compose.yml của dev.
+Mặc định chạy Redis/API/nginx. Để bật AI, đặt trong .env.production:
+COMPOSE_PROFILES=ai và AI_ENABLED=true, rồi điền các khóa/model AI.
+Để bật cả RAG: COMPOSE_PROFILES=rag, AI_ENABLED=true, RAG_ENABLED=true,
+điền thêm khóa Qdrant và cấu hình embedding. Lệnh chạy vẫn như trên.
 
 Truy cập https://<SERVER_NAME>
 Nginx mở cổng 80/443 và proxy đến API HTTP 8080 trong mạng Docker nội bộ.
@@ -107,4 +129,4 @@ Production chưa được kiểm chứng trong quá trình cấu hình HTTPS loc
 - Để dừng Redis local:
 
 cd D:\KLTN\CodePart\api
-docker compose stop redis
+docker compose --profile "*" stop

@@ -25,7 +25,7 @@ public sealed class AuthSecurityRegressionSpecifications
             "2026000011@hanu.edu.vn");
 
         var refreshTasks = Enumerable.Range(0, 20)
-            .Select(_ => SendCookieOnlyRequestAsync("/api/auth/refresh", session.RefreshToken))
+            .Select(_ => SendCookieOnlyRequestAsync("/api/auth/refresh-token", session.RefreshToken))
             .ToArray();
 
         var responses = await Task.WhenAll(refreshTasks);
@@ -47,16 +47,16 @@ public sealed class AuthSecurityRegressionSpecifications
             _fixture,
             "2026000012@hanu.edu.vn");
 
-        using var rotation = await SendCookieOnlyRequestAsync("/api/auth/refresh", session.RefreshToken);
+        using var rotation = await SendCookieOnlyRequestAsync("/api/auth/refresh-token", session.RefreshToken);
         rotation.EnsureSuccessStatusCode();
-        var replacementCookie = rotation.Headers.GetValues("Set-Cookie").Single();
+        var replacementCookie = rotation.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("refreshToken=") && !value.StartsWith("refreshToken=;"));
         var replacementToken = replacementCookie.Split(';', 2)[0].Split('=', 2)[1];
 
-        using var reuse = await SendCookieOnlyRequestAsync("/api/auth/refresh", session.RefreshToken);
+        using var reuse = await SendCookieOnlyRequestAsync("/api/auth/refresh-token", session.RefreshToken);
 
         reuse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        using var familyRevoked = await SendCookieOnlyRequestAsync("/api/auth/refresh", replacementToken);
+        using var familyRevoked = await SendCookieOnlyRequestAsync("/api/auth/refresh-token", replacementToken);
         familyRevoked.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -103,7 +103,7 @@ public sealed class AuthSecurityRegressionSpecifications
         using var repeatedLogout = await SendCookieOnlyRequestAsync("/api/auth/logout", session.RefreshToken);
         repeatedLogout.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        using var refresh = await SendCookieOnlyRequestAsync("/api/auth/refresh", session.RefreshToken);
+        using var refresh = await SendCookieOnlyRequestAsync("/api/auth/refresh-token", session.RefreshToken);
         refresh.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -114,7 +114,7 @@ public sealed class AuthSecurityRegressionSpecifications
             _fixture,
             "2026000018@hanu.edu.vn");
 
-        using var response = await _fixture.Client.PostAsJsonAsync("/api/auth/refresh", new
+        using var response = await _fixture.Client.PostAsJsonAsync("/api/auth/refresh-token", new
         {
             refreshToken = session.RefreshToken
         });
@@ -135,7 +135,7 @@ public sealed class AuthSecurityRegressionSpecifications
 
         logoutAll.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        using var refresh = await SendCookieOnlyRequestAsync("/api/auth/refresh", session.RefreshToken);
+        using var refresh = await SendCookieOnlyRequestAsync("/api/auth/refresh-token", session.RefreshToken);
         refresh.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 

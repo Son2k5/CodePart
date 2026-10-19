@@ -11,6 +11,6 @@ public interface IJwtTokenService
         string email,
         UserRole role,
         UserStatus status,
-        long securityVersion = 1);
+        long securityVersion = 1, Guid? sessionId = null);
     string HashRefreshToken(string refreshToken);
 }

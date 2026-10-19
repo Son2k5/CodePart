@@ -13,7 +13,8 @@ internal enum AdminStatusAction
 {
     ApproveTeacher,
     RejectTeacher,
-    DisableUser
+    DisableUser,
+    EnableUser
 }
 
 internal sealed class AdminStatusChangeService
@@ -63,6 +64,7 @@ internal sealed class AdminStatusChangeService
                 AdminStatusAction.ApproveTeacher => Approve(target, utcNow),
                 AdminStatusAction.RejectTeacher => Reject(target, utcNow),
                 AdminStatusAction.DisableUser => Disable(target, actorId, utcNow),
+                AdminStatusAction.EnableUser => Enable(target, utcNow),
                 _ => throw new ArgumentOutOfRangeException(nameof(requestedAction))
             };
 
@@ -107,6 +109,12 @@ internal sealed class AdminStatusChangeService
     {
         user.ApproveTeacher(utcNow);
         return AuditAction.TeacherApproved;
+    }
+
+    private static AuditAction Enable(Domain.Users.Entities.User user, DateTime utcNow)
+    {
+        user.Enable(utcNow);
+        return AuditAction.UserEnabled;
     }
 
     private static AuditAction Reject(Domain.Users.Entities.User user, DateTime utcNow)

@@ -1,5 +1,43 @@
+# Standalone production stack. Do NOT combine with docker-compose.yml.
+# docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+# Optional profiles: ai / rag (rag includes ai). Set AI_ENABLED/RAG_ENABLED too.
+x-rag-environment: &rag-environment
+  QDRANT_URL: http://qdrant:6333
+  QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+  EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+  EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+  EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+  RAG_MIN_SCORE: ${RAG_MIN_SCORE:-0.35}
+  RAG_ASSET_HOSTS: ${RAG_ASSET_HOSTS:-api.cloudinary.com,res.cloudinary.com}
+
+x-python-service: &python-service
+  build:
+    context: ../ai-service
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  extra_hosts:
+    - host.docker.internal:host-gateway
+  pids_limit: 100
+  networks:
+    - backend
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+    interval: 15s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+
 services:
   redis:
+    image: redis:7-alpine
+    container_name: codepath-redis
     restart: unless-stopped
     command:
       - /bin/sh
@@ -8,13 +46,16 @@ services:
         printf 'user default on >%s ~* &* +@all\n' "$$(cat /run/secrets/redis_password)" > /tmp/users.acl
         chmod 600 /tmp/users.acl
         exec redis-server --appendonly yes --aclfile /tmp/users.acl
-    ports: !reset []
+    volumes:
+      - codepath-redis-data:/data
     secrets:
       - redis_password
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
+      test:
+        - CMD-SHELL
+        - redis-cli --no-auth-warning -a "$$(cat /run/secrets/redis_password)" ping | grep -q PONG
       interval: 10s
       timeout: 5s
       retries: 10
@@ -46,6 +87,18 @@ services:
       Email__Smtp__FromName: ${SMTP_FROM_NAME:-CodePath}
       Email__Smtp__SocketOptions: ${SMTP_SOCKET_OPTIONS:-StartTls}
       CodeExecution__Judge0__BaseUrl: ${JUDGE0_BASE_URL:?JUDGE0_BASE_URL must be set}
+      # Optional integration with an existing Judge0 service.
+      Judge__Enabled: ${JUDGE_ENABLED:-false}
+      Judge__BaseUrl: ${JUDGE_BASE_URL:-http://host.docker.internal:2358/}
+      Judge__ApiToken: ${JUDGE_API_TOKEN:-}
+      Ai__Enabled: ${AI_ENABLED:-false}
+      Ai__BaseUrl: http://ai-service:8000/
+      Ai__ServiceKey: ${AI_SERVICE_KEY:-}
+      Ai__AnonymizationKey: ${AI_ANONYMIZATION_KEY:-}
+      Rag__Enabled: ${RAG_ENABLED:-false}
+      Rag__IndexBaseUrl: http://ai-indexer:8000/
+    extra_hosts:
+      - host.docker.internal:host-gateway
     secrets:
       - source: database_password
         target: Database__Password
@@ -64,6 +117,12 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      ai-service:
+        condition: service_healthy
+        required: false
+      ai-indexer:
+        condition: service_healthy
+        required: false
 
   web:
     build:
@@ -81,6 +140,79 @@ services:
         ipv4_address: 172.30.0.10
     depends_on:
       - api
+
+  ai-service:
+    <<: *python-service
+    profiles: [ai, rag]
+    cpus: 1.0
+    mem_limit: 768m
+    # Validate only when this profile starts; Redis/API-only deployments need no AI keys.
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${SERVICE_API_KEY:?Set AI_SERVICE_KEY}"
+        : "$${REDIS_URL:?Set AI_REDIS_URL to an authenticated Redis URL}"
+        : "$${LLM_MODEL:?Set LLM_MODEL}"
+        : "$${LLM_ADVANCED_MODEL:?Set LLM_ADVANCED_MODEL}"
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --limit-concurrency 32
+    environment:
+      <<: *rag-environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      SERVICE_API_KEY: ${AI_SERVICE_KEY:-}
+      REDIS_URL: ${AI_REDIS_URL:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_ADVANCED_MODEL: ${LLM_ADVANCED_MODEL:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  ai-indexer:
+    <<: *python-service
+    profiles: [rag]
+    cpus: 1.0
+    mem_limit: 1g
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${SERVICE_API_KEY:?Set AI_SERVICE_KEY}"
+        : "$${QDRANT_API_KEY:?Set QDRANT_API_KEY}"
+        : "$${EMBEDDING_BASE_URL:?Set EMBEDDING_BASE_URL}"
+        : "$${EMBEDDING_MODEL:?Set EMBEDDING_MODEL}"
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --limit-concurrency 4
+    environment:
+      <<: *rag-environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      SERVICE_API_KEY: ${AI_SERVICE_KEY:-}
+    depends_on:
+      qdrant:
+        condition: service_started
+
+  qdrant:
+    image: qdrant/qdrant:v1.17.1
+    profiles: [rag]
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${QDRANT__SERVICE__API_KEY:?Set QDRANT_API_KEY}"
+        exec ./entrypoint.sh
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - backend
+    # Only web publishes production ports; Redis, API, AI and Qdrant stay internal.
+
+volumes:
+  codepath-redis-data:
+  qdrant-data:
 
 networks:
   backend:

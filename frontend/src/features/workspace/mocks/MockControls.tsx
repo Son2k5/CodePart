@@ -1,0 +1,4 @@
+import { scenarios } from './fixtures';
+export default function MockControls() {
+  return <details className="ws-demo-controls"><summary>🧪 Kịch bản demo</summary><p>Kết quả mô phỏng, không thực thi code.</p><label>Chạy / nộp bài<select aria-label="Kịch bản chấm bài" defaultValue={sessionStorage.getItem('codepath:mock:verdict') ?? 'Accepted'} onChange={e => sessionStorage.setItem('codepath:mock:verdict', e.target.value)}>{scenarios.map(s => <option key={s}>{s}</option>)}</select></label><label>Trợ giảng<select aria-label="Kịch bản trợ giảng" defaultValue={sessionStorage.getItem('codepath:mock:ai') ?? 'Start'} onChange={e => sessionStorage.setItem('codepath:mock:ai', e.target.value)}>{['Start', 'InProgress', 'LogicError', 'CannotRun', 'PartialPass', 'Locked', 'AI_UNAVAILABLE', 'AI_QUOTA_EXCEEDED'].map(s => <option key={s}>{s}</option>)}</select></label></details>;
+}

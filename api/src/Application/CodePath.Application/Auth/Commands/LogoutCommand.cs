@@ -8,7 +8,7 @@ public sealed record LogoutCommand(
     string? RefreshToken,
     string? Jti = null,
     DateTime? TokenExpiresAtUtc = null,
-    string? IpAddress = null) : IRequest<Result<bool>>;
+    string? IpAddress = null, Guid? SessionId = null) : IRequest<Result<bool>>;
 
 internal sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Result<bool>>
 {
@@ -32,15 +32,15 @@ internal sealed class LogoutCommandHandler : IRequestHandler<LogoutCommand, Resu
     public async Task<Result<bool>> Handle(LogoutCommand request, CancellationToken cancellationToken)
     {
         var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+        var sessionId = request.SessionId;
         if (!string.IsNullOrWhiteSpace(request.RefreshToken))
         {
             var hash = _jwtTokenService.HashRefreshToken(request.RefreshToken);
-            await _authDbContext.RevokeRefreshTokenAsync(
-                hash,
-                utcNow,
-                request.IpAddress,
-                cancellationToken);
+            var token = await _authDbContext.GetRefreshTokenAsync(hash, cancellationToken);
+            sessionId = token?.SessionId ?? sessionId;
         }
+        if (sessionId.HasValue)
+            await _authDbContext.RevokeSessionAsync(sessionId.Value, utcNow, "LOGOUT", cancellationToken);
 
         var remainingLifetime = request.TokenExpiresAtUtc.GetValueOrDefault() - utcNow;
         if (!string.IsNullOrWhiteSpace(request.Jti) && remainingLifetime > TimeSpan.Zero)

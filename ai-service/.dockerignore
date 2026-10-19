@@ -1,0 +1,8 @@
+.venv
+.venv311
+.env
+data
+models
+reports
+**/__pycache__
+.pytest_cache

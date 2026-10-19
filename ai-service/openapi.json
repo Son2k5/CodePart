@@ -1,0 +1,1123 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CodePath AI",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assist": {
+      "post": {
+        "summary": "Endpoint",
+        "operationId": "endpoint_v1_assist_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Guarded hint; X-AI-Code=GUARD_FALLBACK when guardStatus=fallback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/internal/rag/index/topic": {
+      "post": {
+        "summary": "Index",
+        "operationId": "index_internal_rag_index_topic_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/internal/rag/index/delete": {
+      "post": {
+        "summary": "Delete",
+        "operationId": "delete_internal_rag_index_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Scope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/internal/rag/search": {
+      "post": {
+        "summary": "Search",
+        "operationId": "search_internal_rag_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/internal/rag/answer": {
+      "post": {
+        "summary": "Answer",
+        "operationId": "answer_internal_rag_answer_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/internal/rag/draft": {
+      "post": {
+        "summary": "Draft",
+        "operationId": "draft_internal_rag_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnswerRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "passages": {
+            "items": {
+              "$ref": "#/components/schemas/TheoryPassage"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Passages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "passages"
+        ],
+        "title": "AnswerRequest"
+      },
+      "AssistRequest": {
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Requestid"
+          },
+          "studentRef": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Studentref"
+          },
+          "problem": {
+            "$ref": "#/components/schemas/Problem"
+          },
+          "sourceCode": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Sourcecode"
+          },
+          "runState": {
+            "$ref": "#/components/schemas/RunState"
+          },
+          "history": {
+            "$ref": "#/components/schemas/History"
+          },
+          "request": {
+            "$ref": "#/components/schemas/Request"
+          },
+          "theory": {
+            "items": {
+              "$ref": "#/components/schemas/TheoryPassage"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Theory"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requestId",
+          "studentRef",
+          "problem",
+          "sourceCode"
+        ],
+        "title": "AssistRequest"
+      },
+      "AssistResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 6000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "steps": {
+            "items": {
+              "type": "string",
+              "maxLength": 65536
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Steps"
+          },
+          "suspectedLines": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Suspectedlines"
+          },
+          "guidingQuestion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guidingquestion"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "Start",
+              "InProgress",
+              "LogicError",
+              "CannotRun",
+              "PartialPass"
+            ],
+            "title": "Stage"
+          },
+          "stageConfidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Stageconfidence"
+          },
+          "errorCategory": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Errorcategory"
+          },
+          "level": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level"
+          },
+          "guardStatus": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "regenerated",
+              "fallback"
+            ],
+            "title": "Guardstatus"
+          },
+          "modelVersion": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Modelversion"
+          },
+          "promptVersion": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Promptversion"
+          },
+          "tokensIn": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tokensin"
+          },
+          "tokensOut": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Tokensout"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "message",
+          "steps",
+          "suspectedLines",
+          "guidingQuestion",
+          "stage",
+          "stageConfidence",
+          "errorCategory",
+          "level",
+          "guardStatus",
+          "modelVersion",
+          "promptVersion",
+          "tokensIn",
+          "tokensOut"
+        ],
+        "title": "AssistResponse"
+      },
+      "Document": {
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Documentid"
+          },
+          "blockId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Blockid"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 250,
+            "title": "Title"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "pdf"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "documentId",
+          "blockId",
+          "title",
+          "kind"
+        ],
+        "title": "Document"
+      },
+      "DraftRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "passages": {
+            "items": {
+              "$ref": "#/components/schemas/TheoryPassage"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Passages"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "exercise",
+              "quiz"
+            ],
+            "title": "Kind"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "python",
+              "cpp",
+              "java",
+              "csharp"
+            ],
+            "title": "Language",
+            "default": "python"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "passages",
+          "kind"
+        ],
+        "title": "DraftRequest"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "AI_UNAVAILABLE",
+              "INVALID_CONTEXT",
+              "GUARD_FALLBACK"
+            ],
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "ErrorResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "History": {
+        "properties": {
+          "previousHints": {
+            "items": {
+              "$ref": "#/components/schemas/PreviousHint"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Previoushints"
+          },
+          "submitCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Submitcount",
+            "default": 0
+          },
+          "minutesStuck": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Minutesstuck",
+            "default": 0
+          },
+          "consecutiveFailures": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Consecutivefailures",
+            "default": 0
+          },
+          "repeatedCodeCount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Repeatedcodecount",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "History"
+      },
+      "IndexRequest": {
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topicid"
+          },
+          "classId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Classid"
+          },
+          "revision": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            },
+            "type": "array",
+            "maxItems": 300,
+            "title": "Documents"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "topicId",
+          "classId",
+          "revision",
+          "version",
+          "documents"
+        ],
+        "title": "IndexRequest"
+      },
+      "PreviousHint": {
+        "properties": {
+          "level": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 6000,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level",
+          "text"
+        ],
+        "title": "PreviousHint"
+      },
+      "Problem": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Title"
+          },
+          "statement": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Statement"
+          },
+          "constraints": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Constraints",
+            "default": ""
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Language"
+          },
+          "starterCode": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Startercode",
+            "default": ""
+          },
+          "referenceSolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencesolution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "statement",
+          "language"
+        ],
+        "title": "Problem"
+      },
+      "Request": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "AutoHint",
+              "Hint",
+              "TraceTestCase",
+              "ExplainError",
+              "Ask"
+            ],
+            "title": "Type",
+            "default": "Hint"
+          },
+          "level": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Level",
+            "default": 1
+          },
+          "question": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Request"
+      },
+      "RunState": {
+        "properties": {
+          "lastAction": {
+            "type": "string",
+            "enum": [
+              "none",
+              "run",
+              "submit"
+            ],
+            "title": "Lastaction",
+            "default": "none"
+          },
+          "compileError": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compileerror"
+          },
+          "runtimeError": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtimeerror"
+          },
+          "verdicts": {
+            "items": {
+              "$ref": "#/components/schemas/Verdict"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Verdicts"
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Passed",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total",
+            "default": 0
+          },
+          "runtimeMs": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Runtimems",
+            "default": 0
+          },
+          "memoryKb": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Memorykb",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RunState"
+      },
+      "Scope": {
+        "properties": {
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topicid"
+          },
+          "revision": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "topicId",
+          "revision"
+        ],
+        "title": "Scope"
+      },
+      "SearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Scopes"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 5
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query",
+          "scopes"
+        ],
+        "title": "SearchRequest"
+      },
+      "TheoryPassage": {
+        "properties": {
+          "chunkId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chunkid"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Documentid"
+          },
+          "blockId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Blockid"
+          },
+          "topicId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topicid"
+          },
+          "classId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Classid"
+          },
+          "revision": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Revision"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Title"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "heading": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Heading",
+            "default": ""
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 6000,
+            "title": "Content"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chunkId",
+          "documentId",
+          "blockId",
+          "topicId",
+          "classId",
+          "revision",
+          "version",
+          "title",
+          "content"
+        ],
+        "title": "TheoryPassage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Verdict": {
+        "properties": {
+          "testCaseId": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Testcaseid"
+          },
+          "isSample": {
+            "type": "boolean",
+            "title": "Issample"
+          },
+          "verdict": {
+            "type": "string",
+            "maxLength": 65536,
+            "title": "Verdict"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "testCaseId",
+          "isSample",
+          "verdict"
+        ],
+        "title": "Verdict"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Service-Key"
+      }
+    }
+  }
+}

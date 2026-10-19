@@ -1,4 +1,5 @@
 using CodePath.Application.Auth.Abstractions;
+using CodePath.Application.Auth.Services;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auth.Entities;
 using CodePath.Shared.Kernel.Common;
@@ -50,15 +51,21 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
 
         if (existingToken.IsRevoked)
         {
+            if (existingToken.RevokedReason is "IDLE_TIMEOUT" or "SESSION_EXPIRED")
+                return Result<LoginResponse>.Failure("Session expired.", existingToken.RevokedReason == "IDLE_TIMEOUT"
+                    ? SessionActivityService.IdleCode : SessionActivityService.ExpiredCode);
             await RevokeFamilyAsync(existingToken, request.IpAddress, cancellationToken);
             return Result<LoginResponse>.Failure(
                 "Refresh token reuse detected. The token family has been revoked.",
                 ErrorCodes.Unauthorized);
         }
 
-        if (existingToken.IsExpiredAt(utcNow) || utcNow >= existingToken.AbsoluteExpiresAt)
+        var sessionError = SessionActivityService.Check(existingToken, utcNow, _authSessionPolicy.IdleTimeout);
+        if (sessionError is not null)
         {
-            return Result<LoginResponse>.Failure("Refresh token has expired. Please sign in again.", ErrorCodes.Unauthorized);
+            await _authDbContext.RevokeSessionAsync(existingToken.SessionId, utcNow,
+                sessionError == SessionActivityService.IdleCode ? "IDLE_TIMEOUT" : "SESSION_EXPIRED", cancellationToken);
+            return Result<LoginResponse>.Failure("Session expired. Please sign in again.", sessionError);
         }
 
         var user = await _usersDbContext.GetByIdReadOnlyAsync(existingToken.UserId, cancellationToken);
@@ -69,7 +76,7 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
         }
 
         var newTokens = _jwtTokenService.GenerateTokens(
-            user.Id, user.Email, user.Role, user.Status, user.SecurityVersion);
+            user.Id, user.Email, user.Role, user.Status, user.SecurityVersion, existingToken.SessionId);
         var newTokenHash = _jwtTokenService.HashRefreshToken(newTokens.RefreshToken);
         var replacement = RefreshToken.CreateReplacement(
             existingToken,

@@ -11,6 +11,5 @@ export interface LearningPath {
   category: 'foundation' | 'advanced'
   level: string
   description: string
-  topics: string[]
   tone: 'blue' | 'green' | 'yellow'
 }

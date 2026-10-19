@@ -9,6 +9,9 @@ public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submissio
     public void Configure(EntityTypeBuilder<Submission> builder)
     {
         builder.ToTable("submissions");
+        builder.Property(s => s.TeacherScore).HasPrecision(4, 2);
+        builder.Property(s => s.TeacherFeedback).HasMaxLength(2000);
+        builder.Property(s => s.GradedAt).HasColumnType("datetime(6)");
         builder.HasKey(submission => submission.Id);
         builder.Property(submission => submission.Id).ValueGeneratedNever();
         builder.Property(submission => submission.Language).HasMaxLength(32).IsRequired();

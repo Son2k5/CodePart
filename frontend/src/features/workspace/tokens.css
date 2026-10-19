@@ -1,0 +1,23 @@
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/nunito/vietnamese-700.css';
+@import '@fontsource/nunito/latin-800.css';
+@import '@fontsource/be-vietnam-pro/latin-400.css';
+@import '@fontsource/be-vietnam-pro/vietnamese-400.css';
+@import '@fontsource/be-vietnam-pro/latin-500.css';
+@import '@fontsource/be-vietnam-pro/vietnamese-500.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+
+/* Workspace palette follows the landing page's sky, leaf and sunshine accents.
+   Scope tokens so existing admin/teacher screens retain their appearance. */
+.workspace {
+  --ws-bg: #f7f9f4; --ws-surface: #fff; --ws-soft: #f2f7f3;
+  --ws-border: #e2e9e3; --ws-text: #34483f; --ws-muted: #64756e;
+  --ws-primary: #d9edb9; --ws-primary-text: #355524;
+  --ws-mint: #e7f4e9; --ws-mint-text: #386846;
+  --ws-coral: #fff0eb; --ws-coral-text: #994935;
+  --ws-butter: #fff7da; --ws-butter-text: #80601c;
+  --ws-sky: #e9f4fa; --ws-sky-text: #3b657a;
+  --ws-shadow: 0 4px 22px #3b665108; --ws-radius: 18px;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif; color: var(--ws-text);
+  font-size: 13px; line-height: 1.65;
+}

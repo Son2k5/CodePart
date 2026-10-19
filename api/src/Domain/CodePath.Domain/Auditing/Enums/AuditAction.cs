@@ -4,5 +4,9 @@ public enum AuditAction
 {
     TeacherApproved,
     TeacherRejected,
-    UserDisabled
+    UserDisabled,
+    UserEnabled,
+    TeacherCreated,
+    TeacherUpdated,
+    ClassChanged
 }

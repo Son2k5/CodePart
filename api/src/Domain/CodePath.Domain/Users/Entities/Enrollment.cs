@@ -21,6 +21,15 @@ public sealed class Enrollment : BaseEntity
 
     private Enrollment() { }
 
+    public void Rejoin(DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (Status != EnrollmentStatus.Dropped)
+            throw new DomainRuleViolationException("Only a dropped enrollment can rejoin.");
+        Status = EnrollmentStatus.Active;
+        Touch(utcNow);
+    }
+
     public static Enrollment Create(Guid courseId, Guid studentId, DateTime utcNow)
     {
         if (courseId == Guid.Empty)

@@ -4,6 +4,9 @@ namespace CodePath.Domain.Auth.Entities;
 
 public sealed class RefreshToken : BaseEntity
 {
+    public Guid SessionId { get; private set; }
+    public DateTime LastActiveAt { get; private set; }
+    public string? RevokedReason { get; private set; }
     public Guid UserId { get; private set; }
     public Guid FamilyId { get; private set; }
     public Guid? ParentTokenId { get; private set; }
@@ -30,10 +33,14 @@ public sealed class RefreshToken : BaseEntity
         DateTime utcNow,
         Guid? familyId = null,
         Guid? parentTokenId = null,
-        string? createdByIp = null)
+        string? createdByIp = null,
+        Guid? sessionId = null, DateTime? lastActiveAt = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tokenHash);
         EnsureUtc(utcNow);
+        EnsureUtc(expiresAt);
+        EnsureUtc(absoluteExpiresAt);
+        if (lastActiveAt.HasValue) EnsureUtc(lastActiveAt.Value);
         if (absoluteExpiresAt <= utcNow)
         {
             throw new ArgumentOutOfRangeException(nameof(absoluteExpiresAt));
@@ -44,6 +51,8 @@ public sealed class RefreshToken : BaseEntity
         return new RefreshToken
         {
             Id = id,
+            SessionId = sessionId ?? familyId ?? id,
+            LastActiveAt = lastActiveAt ?? utcNow,
             UserId = userId,
             FamilyId = familyId ?? id,
             ParentTokenId = parentTokenId,
@@ -69,7 +78,13 @@ public sealed class RefreshToken : BaseEntity
             utcNow,
             parent.FamilyId,
             parent.Id,
-            createdByIp);
+            createdByIp, parent.SessionId, parent.LastActiveAt);
+
+    public void PreserveActivity(DateTime lastActiveAt)
+    {
+        EnsureUtc(lastActiveAt);
+        LastActiveAt = lastActiveAt;
+    }
 
     public void Revoke(DateTime utcNow, string? revokedByIp = null, string? replacedByTokenHash = null)
     {

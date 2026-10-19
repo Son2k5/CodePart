@@ -1,0 +1,91 @@
+import { test, expect } from '@playwright/test';
+test('desktop: drafts, run, submit, AI and keyboard resize', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/problems/demo-sum');
+  await expect(page.getByRole('heading', { name: 'Tổng hai số', exact: true })).toBeVisible();
+  const editor = page.locator('.monaco-editor textarea'); await expect(editor).toBeVisible();
+  await page.locator(".monaco-editor .view-lines").click(); await page.keyboard.press('Control+End'); await page.keyboard.type('print(a + b)');
+  await page.keyboard.press('Control+s');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('codepath:draft:v2:workspace-demo:demo-sum:python'))).toContain('print(a + b)');
+  await page.getByLabel('Ngôn ngữ lập trình').selectOption('cpp');
+  await expect(page.locator('.monaco-editor')).toContainText('#include');
+  await page.getByLabel('Ngôn ngữ lập trình').selectOption('python');
+  await expect(page.locator('.monaco-editor')).toContainText('print(a + b)');
+  await page.getByRole('button', { name: 'Chạy thử', exact: true }).first().click();
+  await expect(page.getByText('Đã chạy xong')).toBeVisible();
+  await page.getByRole('button', { name: 'Nộp bài', exact: true }).first().click();
+  await expect(page.getByText('Đang xếp hàng').first()).toBeVisible();
+  await expect(page.locator('.ws-verdict').getByText('Chính xác rồi!', { exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('button', { name: 'Nộp bài', exact: true }).first()).toBeEnabled();
+  await page.getByRole('tab', { name: 'Trợ giảng AI' }).click();
+  await page.getByRole('button', { name: 'Gợi ý 1', exact: true }).click();
+  await expect(page.getByText('Bạn muốn thử sửa bước nào trước?')).toBeVisible();
+  const separator = page.getByRole('separator', { name: 'Đổi độ rộng đề bài và code' });
+  await separator.focus(); await page.keyboard.press('ArrowRight');
+  await page.getByRole('tab', { name: 'Đề bài', exact: true }).click();
+  await page.screenshot({ path: 'test-results/workspace-desktop.png', fullPage: true });
+  expect(errors).toEqual([]);
+});
+for (const width of [360, 768]) {
+  test(`mobile ${width}: tabs, custom input and no horizontal overflow`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 850 });
+    await page.goto('/problems/demo-sum');
+    await expect(page.getByRole('heading', { name: 'Tổng hai số', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    const dock = page.getByRole('navigation', { name: 'Không gian làm bài trên di động' });
+    await dock.getByRole('button', { name: 'Code', exact: true }).click();
+    await expect(page.locator('.monaco-editor textarea')).toBeVisible();
+    await expect(page.locator('.ws-editor-card')).toBeInViewport({ ratio: 0.9 });
+    await expect(page.locator('.ws-problem')).not.toBeVisible();
+    await page.screenshot({ path: `test-results/workspace-${width}.png`, fullPage: true });
+    await dock.getByRole('button', { name: 'Kết quả', exact: true }).click();
+    await page.locator('.ws-mobile-results').getByRole('tab', { name: 'Testcase' }).click();
+    await page.getByRole('button', { name: '+ Input của bạn', exact: true }).click();
+    await page.getByLabel('Đầu vào tùy chỉnh').fill('8 9');
+    await page.getByRole('button', { name: 'Chạy thử', exact: true }).last().click();
+    await expect(page.locator('.ws-mobile-results').getByText('Đã chạy xong')).toBeVisible();
+    await expect(page.locator('.ws-mobile-results').getByText('17', { exact: true })).toBeVisible();
+    await expect(page.locator('.ws-mobile-results')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  });
+}
+
+test('compile diagnostics, reset confirmation, quota and reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/problems/demo-sum');
+  await expect(page.locator('.monaco-editor textarea')).toBeVisible();
+  await page.locator('.ws-demo-controls summary').click();
+  await page.getByLabel('Kịch bản chấm bài').selectOption('CompileError');
+  await page.locator('.ws-top-actions').getByRole('button', { name: 'Chạy thử', exact: true }).click();
+  await expect(page.locator('.ws-result-card').first()).toContainText('Lỗi biên dịch');
+  await page.getByRole('button', { name: 'Đến dòng 5' }).first().click();
+  await expect(page.locator('.monaco-editor .squiggly-error').first()).toBeAttached();
+  await page.keyboard.type('# fixed');
+  await expect(page.locator('.monaco-editor .squiggly-error')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Khôi phục code mẫu', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Giữ bản nháp' }).click();
+  await expect(page.locator('.monaco-editor')).toContainText('# fixed');
+  await page.getByRole('button', { name: 'Khôi phục code mẫu', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Khôi phục code mẫu' }).click();
+  await expect(page.locator('.monaco-editor')).not.toContainText('# fixed');
+  await page.getByLabel('Kịch bản chấm bài').selectOption('RATE_LIMITED');
+  await page.locator('.ws-top-actions').getByRole('button', { name: 'Chạy thử', exact: true }).click();
+  await expect(page.locator('.ws-inline-error')).toBeVisible();
+  await expect(page.locator('.ws-top-actions').getByRole('button', { name: 'Nộp bài', exact: true })).toBeEnabled();
+  await page.getByLabel('Kịch bản trợ giảng').selectOption('AI_QUOTA_EXCEEDED');
+  await page.getByRole('tab', { name: 'Trợ giảng AI' }).click();
+  await page.getByRole('button', { name: 'Gợi ý 1', exact: true }).click();
+  await expect(page.getByText('Em đã dùng hết lượt gợi ý hôm nay.')).toBeVisible();
+  expect(await page.locator('.ws-dots i').count()).toBe(0);
+});
+
+test('topic context preserves next problem navigation', async ({ page }) => {
+  await page.goto('/classes/demo-class/topics/nhap-xuat/problems/demo-sum');
+  await expect(page.getByText('Làm quen với nhập xuất')).toBeVisible();
+  await page.getByRole('button', { name: 'Bài tiếp theo', exact: true }).click();
+  await expect(page).toHaveURL(/\/classes\/demo-class\/topics\/nhap-xuat\/problems\/demo-next$/);
+  await expect(page.getByRole('heading', { name: 'Luyện tập: Tổng hai số', exact: true })).toBeVisible();
+});

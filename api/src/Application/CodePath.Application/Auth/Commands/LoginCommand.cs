@@ -163,8 +163,9 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
             user.UpgradePasswordHash(upgradedPasswordHash, utcNow);
         }
 
+        var sessionId = Guid.NewGuid();
         var tokens = _jwtTokenService.GenerateTokens(
-            user.Id, user.Email, user.Role, user.Status, user.SecurityVersion);
+            user.Id, user.Email, user.Role, user.Status, user.SecurityVersion, sessionId);
         var tokenHash = _jwtTokenService.HashRefreshToken(tokens.RefreshToken);
 
         var refreshTokenEntity = RefreshToken.Create(
@@ -173,7 +174,7 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, Result
             utcNow.Add(_authSessionPolicy.RefreshTokenLifetime),
             utcNow.Add(_authSessionPolicy.RefreshTokenAbsoluteLifetime),
             utcNow,
-            createdByIp: request.IpAddress);
+            createdByIp: request.IpAddress, sessionId: sessionId);
 
         await _authDbContext.AddRefreshTokenAsync(refreshTokenEntity, cancellationToken);
         await _authDbContext.SaveChangesAsync(cancellationToken);

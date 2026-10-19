@@ -14,7 +14,7 @@ using Xunit;
 namespace CodePath.Integration.Tests.Admin;
 
 [Collection(IntegrationTestCollection.Name)]
-public sealed class AdminWorkflowSpecifications
+public sealed partial class AdminWorkflowSpecifications
 {
     private readonly CodePathApiFixture _fixture;
 
@@ -71,7 +71,7 @@ public sealed class AdminWorkflowSpecifications
         loginResponse.EnsureSuccessStatusCode();
         var loginPayload = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
         var teacherAccessToken = loginPayload.GetProperty("accessToken").GetString()!;
-        var refreshToken = loginResponse.Headers.GetValues("Set-Cookie").Single()
+        var refreshToken = loginResponse.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("refreshToken=") && !value.StartsWith("refreshToken=;"))
             .Split(';', 2)[0]
             .Split('=', 2)[1];
 
@@ -154,11 +154,7 @@ public sealed class AdminWorkflowSpecifications
         await dbContext.Users.AddRangeAsync(admin, teacher);
         await dbContext.SaveChangesAsync();
 
-        var adminAccessToken = jwtTokenService.GenerateTokens(
-            admin.Id,
-            admin.Email,
-            admin.Role,
-            admin.Status).AccessToken;
+        var adminAccessToken = await AuthTestClient.IssueSessionAsync(scope.ServiceProvider, admin);
 
         return (admin, teacher, adminAccessToken);
     }

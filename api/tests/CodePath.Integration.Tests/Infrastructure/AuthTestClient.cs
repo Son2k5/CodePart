@@ -8,6 +8,19 @@ namespace CodePath.Integration.Tests.Infrastructure;
 
 internal static class AuthTestClient
 {
+    public static async Task<string> IssueSessionAsync(IServiceProvider services, CodePath.Domain.Users.Entities.User user)
+    {
+        var time = services.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+        var jwt = services.GetRequiredService<CodePath.Application.Auth.Abstractions.IJwtTokenService>();
+        var db = services.GetRequiredService<CodePath.Infrastructure.Persistence.AppDbContext>();
+        var sid = Guid.NewGuid();
+        var tokens = jwt.GenerateTokens(user.Id, user.Email, user.Role, user.Status, user.SecurityVersion, sid);
+        db.RefreshTokens.Add(CodePath.Domain.Auth.Entities.RefreshToken.Create(user.Id,
+            jwt.HashRefreshToken(tokens.RefreshToken), time.AddDays(7), time.AddDays(7), time, sessionId: sid));
+        await db.SaveChangesAsync();
+        return tokens.AccessToken;
+    }
+
     public const string ValidPassword = "ValidPassword1!";
 
     public static async Task<AuthSession> RegisterVerifyAndLoginAsync(
@@ -45,7 +58,7 @@ internal static class AuthTestClient
         accessToken.Should().NotBeNullOrWhiteSpace();
         payload.TryGetProperty("refreshToken", out _).Should().BeFalse();
 
-        var setCookie = loginResponse.Headers.GetValues("Set-Cookie").Single();
+        var setCookie = loginResponse.Headers.GetValues("Set-Cookie").Single(value => value.StartsWith("refreshToken=") && !value.StartsWith("refreshToken=;"));
         var refreshToken = setCookie
             .Split(';', 2)[0]
             .Split('=', 2)[1];

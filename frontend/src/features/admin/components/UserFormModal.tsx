@@ -2,18 +2,21 @@ import React, { useState } from 'react';
 import { X, UserPlus, Save, GraduationCap, UserCheck } from 'lucide-react';
 import type { AdminUserItem } from '../types/admin.types';
 import type { Role, UserStatus } from '../../auth/types/auth.types';
+import { teacherError, type Faculty, type TeacherFormData } from '../api/adminTeacherApi';
 import { DEPARTMENTS } from '../data/mockAdminData';
 
 interface UserFormModalProps {
+  faculties?: Faculty[];
   fixedRole?: 'Student' | 'Teacher';
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (userData: Partial<AdminUserItem>) => void;
+  onSubmit: (userData: TeacherFormData) => void | Promise<void>;
   initialData?: AdminUserItem | null;
 }
 
 const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
   fixedRole,
+  faculties,
   onClose,
   onSubmit,
   initialData,
@@ -27,13 +30,17 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
   const [identifier, setIdentifier] = useState(
     initialData?.studentId || initialData?.teacherId || ''
   );
-  const [department, setDepartment] = useState(initialData?.department || DEPARTMENTS[0]);
+  const [department, setDepartment] = useState(faculties ? initialData?.facultyId ?? '' : initialData?.department || DEPARTMENTS[0]);
   const [phone, setPhone] = useState(initialData?.phone || '');
   const [bio, setBio] = useState(initialData?.bio || '');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setError(null);
 
     if (!fullName.trim()) {
@@ -41,17 +48,19 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
       return;
     }
 
-    if (!email.trim() || !email.endsWith('@hanu.edu.vn')) {
+    if (!email.trim() || !email.trim().toLowerCase().endsWith('@hanu.edu.vn')) {
       setError('Email trường bắt buộc phải có đuôi @hanu.edu.vn');
       return;
     }
 
-    const payload: Partial<AdminUserItem> = {
+    const payload: TeacherFormData = {
       fullName: fullName.trim(),
       email: email.trim().toLowerCase(),
       role,
       status,
-      department,
+      department: faculties ? faculties.find(f => f.id === department)?.name : department,
+      facultyId: faculties ? department || null : undefined,
+      temporaryPassword,
       phone: phone.trim(),
       bio: bio.trim(),
       ...(role === 'Student'
@@ -59,8 +68,10 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
         : { teacherId: identifier.trim() || undefined, studentId: undefined }),
     };
 
-    onSubmit(payload);
-    onClose();
+    setSaving(true);
+    try { await onSubmit(payload); onClose(); }
+    catch (err) { setError(teacherError(err)); }
+    finally { setSaving(false); }
   };
 
   return (
@@ -102,6 +113,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
           <div className="space-y-1">
             <label className="font-semibold text-slate-700">Họ và tên *</label>
             <input
+              maxLength={200}
               type="text"
               required
               value={fullName}
@@ -125,6 +137,17 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
             />
           </div>
 
+          {faculties && !isEditing && <>
+            <label className="block space-y-1">Mật khẩu tạm thời *
+              <input type="password" autoComplete="new-password" required minLength={8} maxLength={128} value={temporaryPassword} onChange={e => setTemporaryPassword(e.target.value)} className="w-full p-3 border rounded-xl" />
+              <small>8–128 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt.</small>
+            </label>
+            <label className="block space-y-1">Trạng thái ban đầu
+              <select value={status} onChange={e => setStatus(e.target.value as UserStatus)} className="w-full p-3 border rounded-xl">
+                <option value="Active">Đang hoạt động</option><option value="Pending">Chờ phê duyệt</option>
+              </select>
+            </label>
+          </>}
           {/* Role selection tabs */}
           {!fixedRole && <div className="space-y-1.5">
             <label className="font-semibold text-slate-700">Vai trò người dùng *</label>
@@ -166,7 +189,8 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
               </label>
               <input
                 type="text"
-                value={identifier}
+                maxLength={50}
+              value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder={role === 'Student' ? 'VD: 2101040001' : 'VD: GV-CNTT-082'}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-800 text-xs font-mono"
@@ -174,7 +198,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
             </div>
 
             {/* Status */}
-            <div className="space-y-1">
+            {!faculties && <div className="space-y-1">
               <label className="font-semibold text-slate-700">Trạng thái *</label>
               <select
                 value={status}
@@ -186,7 +210,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
                 <option value="Disabled">Đã khóa (Disabled)</option>
                 <option value="Rejected">Đã từ chối (Rejected)</option>
               </select>
-            </div>
+            </div>}
           </div>
 
           {/* Department */}
@@ -197,7 +221,8 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
               onChange={(e) => setDepartment(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 text-slate-800 text-xs"
             >
-              {DEPARTMENTS.map((d) => (
+              {faculties && <option value="">Chưa phân khoa</option>}
+              {faculties ? faculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>) : DEPARTMENTS.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -210,6 +235,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
             <label className="font-semibold text-slate-700">Số điện thoại liên hệ</label>
             <input
               type="text"
+              maxLength={20}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="VD: 0981234567"
@@ -221,6 +247,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
           <div className="space-y-1">
             <label className="font-semibold text-slate-700">Ghi chú / Giới thiệu</label>
             <textarea
+              maxLength={1000}
               rows={2}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
@@ -240,6 +267,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
             </button>
             <button
               type="submit"
+              disabled={saving}
               className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs cursor-pointer transition-all flex items-center gap-1.5"
             >
               <Save className="w-3.5 h-3.5" />
@@ -254,6 +282,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
 
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   fixedRole,
+  faculties,
   isOpen,
   onClose,
   onSubmit,
@@ -263,6 +292,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
   return (
     <UserFormDialog
+      faculties={faculties}
       fixedRole={fixedRole}
       key={initialData?.id || 'new'}
       onClose={onClose}

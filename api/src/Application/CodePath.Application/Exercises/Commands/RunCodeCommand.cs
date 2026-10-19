@@ -11,7 +11,7 @@ public sealed record RunCodeCommand(
     Guid ExerciseId,
     string Language,
     string SourceCode,
-    string? CustomInput) : IRequest<Result<ExecutionResultDto>>;
+    string? CustomInput, Guid? StudentId = null) : IRequest<Result<ExecutionResultDto>>;
 
 public sealed class RunCodeCommandValidator : AbstractValidator<RunCodeCommand>
 {
@@ -35,7 +35,7 @@ internal sealed class RunCodeCommandHandler(IExerciseDbContext dbContext, ICodeE
             return Result<ExecutionResultDto>.Failure("The selected language is not supported.");
 
         var exercise = await dbContext.GetPublishedByIdAsync(request.ExerciseId, cancellationToken);
-        if (exercise is null)
+        if (exercise is null || (exercise.CourseId.HasValue && !await dbContext.CanAccessCourseExerciseAsync(exercise.CourseId.Value, request.StudentId, true, cancellationToken)))
             return Result<ExecutionResultDto>.Failure("Exercise was not found.", ErrorCodes.NotFound);
 
         var cases = request.CustomInput is null

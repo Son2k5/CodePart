@@ -14,7 +14,7 @@ using MySqlConnector;
 
 namespace CodePath.Infrastructure.Persistence;
 
-public class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDbContext, IExerciseDbContext
+public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDbContext, IExerciseDbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -62,6 +62,7 @@ public class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDb
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(token => token.RevokedAt, revokedAtUtc)
                     .SetProperty(token => token.RevokedByIp, revokedByIp)
+                    .SetProperty(token => token.RevokedReason, "ROTATED")
                     .SetProperty(token => token.ReplacedByTokenHash, replacement.TokenHash)
                     .SetProperty(token => token.UpdatedAt, revokedAtUtc)
                     .SetProperty(token => token.UpdatedBy, revokedByIp),
@@ -70,6 +71,11 @@ public class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDb
             if (affectedRows != 1)
                 return false;
 
+            // The update above holds the parent row lock until commit. Preserve any
+            // activity committed before rotation instead of copying a stale read.
+            var activity = await RefreshTokens.Where(t => t.TokenHash == currentTokenHash)
+                .Select(t => t.LastActiveAt).SingleAsync(transactionCancellationToken);
+            replacement.PreserveActivity(activity);
             await RefreshTokens.AddAsync(replacement, transactionCancellationToken);
             await base.SaveChangesAsync(transactionCancellationToken);
             return true;
@@ -318,6 +324,7 @@ public class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDb
     // IExerciseDbContext Implementation
     Task<Exercise?> IExerciseDbContext.GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken)
         => Exercises.AsNoTracking()
+            .Include(exercise => exercise.Course)
             .Include(exercise => exercise.TestCases.Where(test => test.IsSample))
             .FirstOrDefaultAsync(exercise => exercise.Slug == slug && exercise.IsPublished, cancellationToken);
 
@@ -334,6 +341,7 @@ public class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDb
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        EnqueueRagChanges();
         try
         {
             return await base.SaveChangesAsync(cancellationToken);
