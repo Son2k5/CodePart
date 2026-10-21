@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import Editor, { loader } from '@monaco-editor/react';
-import * as monaco from 'monaco-editor';
+import * as monaco from 'monaco-editor/editor/editor.api';
+import 'monaco-editor/languages/definitions/python/register.js';
+import 'monaco-editor/languages/definitions/cpp/register.js';
+import 'monaco-editor/languages/definitions/java/register.js';
+import 'monaco-editor/languages/definitions/csharp/register.js';
+import 'monaco-editor/languages/definitions/javascript/register.js';
 import EditorWorker from 'monaco-editor/editor/editor.worker.js?worker';
 import type { WorkspaceStore } from './store';
 import { Loading } from './ui';

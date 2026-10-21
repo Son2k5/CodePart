@@ -32,6 +32,15 @@ public sealed class User : BaseEntity
 
     private User() { }
 
+    public void UpdateFullName(string fullName, DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (string.IsNullOrWhiteSpace(fullName) || fullName.Trim().Length > 200)
+            throw new DomainValidationException("Full name must contain 1 to 200 characters.", nameof(fullName));
+        FullName = fullName.Trim();
+        Touch(utcNow);
+    }
+
     public static User CreateTeacherByAdmin(string fullName, string email, string passwordHash,
         string? teacherId, Guid? facultyId, string? phoneNumber, string? bio,
         UserStatus status, DateTime utcNow)
@@ -43,6 +52,41 @@ public sealed class User : BaseEntity
         user.VerifyEmail(utcNow);
         if (status == UserStatus.Active) user.ApproveTeacher(utcNow);
         return user;
+    }
+
+    public static User CreateStudentByAdmin(string fullName, string email, string passwordHash,
+        string studentId, Guid? facultyId, string? phoneNumber, string? bio,
+        UserStatus status, DateTime utcNow)
+    {
+        if (status is not (UserStatus.Active or UserStatus.Pending))
+            throw new DomainValidationException("New students must be Active or Pending.", nameof(status));
+        var user = CreateStudent(fullName, email, passwordHash, studentId, utcNow);
+        user.UpdateStudentProfile(fullName, studentId, facultyId, phoneNumber, bio, utcNow);
+        user.VerifyEmail(utcNow);
+        if (status == UserStatus.Pending) user.Status = UserStatus.Pending;
+        return user;
+    }
+
+    public void UpdateStudentProfile(string fullName, string studentId, Guid? facultyId,
+        string? phoneNumber, string? bio, DateTime utcNow)
+    {
+        EnsureUtc(utcNow);
+        if (Role != UserRole.Student)
+            throw new DomainRuleViolationException("Only students have a student profile.", ErrorCodes.Conflict);
+        if (string.IsNullOrWhiteSpace(fullName) || fullName.Trim().Length > 200)
+            throw new DomainValidationException("Full name must contain 1 to 200 characters.", nameof(fullName));
+        if (string.IsNullOrWhiteSpace(studentId) || studentId.Trim().Length > 50)
+            throw new DomainValidationException("Student ID must contain 1 to 50 characters.", nameof(studentId));
+        if (phoneNumber?.Trim().Length > 20 || bio?.Trim().Length > 1000)
+            throw new DomainValidationException("Student profile exceeds the allowed length.");
+        if (facultyId == Guid.Empty)
+            throw new DomainValidationException("Faculty ID cannot be empty.", nameof(facultyId));
+        FullName = fullName.Trim();
+        StudentId = studentId.Trim();
+        PhoneNumber = string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
+        Bio = string.IsNullOrWhiteSpace(bio) ? null : bio.Trim();
+        FacultyId = facultyId;
+        Touch(utcNow);
     }
 
     public void UpdateTeacherProfile(string fullName, string? teacherId, Guid? facultyId,
@@ -203,6 +247,20 @@ public sealed class User : BaseEntity
         Touch(utcNow);
     }
 
+    public void ApproveStudent(DateTime utcNow)
+    {
+        EnsureStudentPending("approved");
+        Status = UserStatus.Active;
+        Touch(utcNow);
+    }
+
+    public void RejectStudent(DateTime utcNow)
+    {
+        EnsureStudentPending("rejected");
+        Status = UserStatus.Rejected;
+        Touch(utcNow);
+    }
+
     public void Disable(Guid actorId, DateTime utcNow)
     {
         if (actorId == Id)
@@ -303,6 +361,19 @@ public sealed class User : BaseEntity
         if (Role != UserRole.Teacher)
             throw new DomainRuleViolationException(
                 $"Only teacher accounts can be {action}.",
+                ErrorCodes.Conflict);
+
+        if (Status != UserStatus.Pending)
+            throw new DomainRuleViolationException(
+                $"User status cannot transition from {Status} for action '{action}'. Rejected accounts cannot return to Pending.",
+                ErrorCodes.Conflict);
+    }
+
+    private void EnsureStudentPending(string action)
+    {
+        if (Role != UserRole.Student)
+            throw new DomainRuleViolationException(
+                $"Only student accounts can be {action}.",
                 ErrorCodes.Conflict);
 
         if (Status != UserStatus.Pending)

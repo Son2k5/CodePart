@@ -1,7 +1,7 @@
 import { axiosInstance as api } from '../../lib/axios';
+import { getErrorMessage } from '../../lib/errorService';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import axios from 'axios';
 export type Starter = { language: string; template: string };
 export type Test = { id?: string; input: string; expectedOutput: string; isSample: boolean; order: number; weight: number };
 export type Problem = { id: string; title: string; description: string; difficulty: string; timeLimitMs: number; memoryLimitMb: number; points: number; courseId: string | null; classId: string | null; status: string; comparisonMode: number; starterCodes: Starter[]; testCases: Test[] };
@@ -31,7 +31,5 @@ export function useSubmissionStatus(id?: string) {
     retry: 2, refetchIntervalInBackground: false });
 }
 export function judgeError(error: unknown) {
-  const messages: Record<string, string> = { RATE_LIMITED: 'Bạn thao tác hơi nhanh. Vui lòng thử lại sau một phút.', RATE_LIMIT_EXCEEDED: 'Đã đạt giới hạn lượt chạy. Vui lòng đợi một phút.', SUBMISSION_IN_PROGRESS: 'Bài nộp trước vẫn đang được chấm.', COMPILE_ERROR: 'Code chưa biên dịch được. Hãy xem thông báo trong Console.' };
-  const data = axios.isAxiosError(error) ? error.response?.data : null;
-  toast.error(messages[data?.code] || data?.detail || 'Không thể hoàn thành yêu cầu. Vui lòng thử lại.');
+  toast.error(getErrorMessage(error, 'Không thể hoàn thành yêu cầu. Vui lòng thử lại.'));
 }

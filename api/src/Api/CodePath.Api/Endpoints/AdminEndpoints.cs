@@ -2,6 +2,7 @@ using CodePath.Api.Extensions;
 using CodePath.Application.Admin.Commands;
 using CodePath.Application.Admin.Queries;
 using CodePath.Application.Admin.Dtos;
+using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
@@ -20,6 +21,7 @@ public static partial class AdminEndpoints
             .RequireAuthorization("AdminOnly");
 
         MapTeacherManagement(group);
+        MapStudentManagement(group);
 
         group.MapGet("/teachers", async (
             [FromQuery] UserStatus? status,
@@ -37,7 +39,7 @@ public static partial class AdminEndpoints
                 return (await sender.Send(new GetTeachersPagedQuery(new TeacherFilter(
                     page ?? 1, pageSize ?? 20, search, facultyId, status, sortBy ?? "created_desc")), cancellationToken)).ToHttpResult();
             if (page.HasValue || pageSize.HasValue || search is not null || facultyId.HasValue || sortBy is not null)
-                return Results.Problem("Cursor pagination cannot be combined with offset pagination or search filters.", statusCode: 400);
+                return Result<object>.Failure("Không thể kết hợp phân trang con trỏ với bộ lọc tìm kiếm.", ErrorCodes.BadRequest).ToHttpResult();
             var result = await sender.Send(
                 new ListTeachersQuery(status, cursor, NormalizeLimit(limit)),
                 cancellationToken);
@@ -107,6 +109,27 @@ public static partial class AdminEndpoints
         .WithName("DisableUser")
         .Produces(StatusCodes.Status200OK)
         .ProducesProblem(StatusCodes.Status403Forbidden)
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete("/users/{id:guid}", async (
+            Guid id,
+            HttpContext httpContext,
+            ISender sender,
+            CancellationToken cancellationToken) =>
+        {
+            var actorId = httpContext.User.GetUserId();
+            if (actorId is null)
+                return Results.Unauthorized();
+
+            var result = await sender.Send(
+                new DeleteUserCommand(actorId.Value, id, GetClientIp(httpContext)),
+                cancellationToken);
+            return result.ToHttpResult();
+        })
+        .WithName("DeleteUser")
+        .Produces(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound)
         .ProducesProblem(StatusCodes.Status409Conflict);
 

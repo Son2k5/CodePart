@@ -6,8 +6,40 @@ import { Agent } from 'node:https'
 
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
-  // Production assets are built without access to local TLS private keys.
-  if (command === 'build') return { plugins: [react(), tailwindcss()] }
+  if (command === 'build') {
+    return {
+      plugins: [react(), tailwindcss()],
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes('node_modules')) {
+                if (id.includes('/react/') || id.includes('/react-dom/')) {
+                  return 'vendor-react';
+                }
+                if (id.includes('react-router') || id.includes('react-router-dom')) {
+                  return 'vendor-router';
+                }
+                if (id.includes('@tanstack/react-query') || id.includes('@tanstack/query-core')) {
+                  return 'vendor-query';
+                }
+                if (id.includes('monaco-editor') || id.includes('@monaco-editor')) {
+                  return 'vendor-monaco';
+                }
+                if (id.includes('@codemirror') || id.includes('@uiw/react-codemirror')) {
+                  return 'vendor-codemirror';
+                }
+                if (id.includes('lucide-react')) {
+                  return 'vendor-icons';
+                }
+              }
+            },
+          },
+        },
+        chunkSizeWarningLimit: 800,
+      },
+    };
+  }
 
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   if (process.env.VITE_USE_MOCK === 'true' || env.VITE_USE_MOCK === 'true') {

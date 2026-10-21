@@ -30,9 +30,9 @@ public sealed class EmailSender : IEmailSender
 
     public async Task SendOtpEmailAsync(string toEmail, string otp, CancellationToken ct = default)
     {
-        if (_environment.IsDevelopment() || _environment.IsEnvironment("Testing"))
+        if (_environment.IsEnvironment("Testing"))
         {
-            _logger.LogDebug("OTP email delivery suppressed outside production for {Recipient}.", toEmail);
+            _logger.LogDebug("OTP email delivery suppressed in Testing for {Recipient}.", toEmail);
             return;
         }
 
@@ -50,9 +50,9 @@ public sealed class EmailSender : IEmailSender
         string resetToken,
         CancellationToken ct = default)
     {
-        if (_environment.IsDevelopment() || _environment.IsEnvironment("Testing"))
+        if (_environment.IsEnvironment("Testing"))
         {
-            _logger.LogDebug("Password reset email delivery suppressed outside production for {Recipient}.", toEmail);
+            _logger.LogDebug("Password reset email delivery suppressed in Testing for {Recipient}.", toEmail);
             return;
         }
 
@@ -70,9 +70,9 @@ public sealed class EmailSender : IEmailSender
         string toEmail,
         CancellationToken ct = default)
     {
-        if (_environment.IsDevelopment() || _environment.IsEnvironment("Testing"))
+        if (_environment.IsEnvironment("Testing"))
         {
-            _logger.LogDebug("Password change notification suppressed outside production for {Recipient}.", toEmail);
+            _logger.LogDebug("Password change notification suppressed in Testing for {Recipient}.", toEmail);
             return;
         }
 
@@ -91,6 +91,12 @@ public sealed class EmailSender : IEmailSender
         MimeEntity body,
         CancellationToken ct)
     {
+        if (!_options.IsConfigured)
+        {
+            throw new InvalidOperationException(
+                "Email SMTP is not configured. Set Email:Smtp:Host, FromAddress and SMTP credentials before sending authentication emails.");
+        }
+
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_options.FromName, _options.FromAddress));
         message.To.Add(MailboxAddress.Parse(toEmail));

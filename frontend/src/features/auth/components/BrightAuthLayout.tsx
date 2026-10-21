@@ -7,10 +7,12 @@ interface BrightAuthLayoutProps {
   children: ReactNode;
   title: string;
   subtitle: string;
-  variant: 'login' | 'register' | 'forgot';
+  variant: 'login' | 'register' | 'forgot' | 'reset' | 'verify';
 }
 
 const messages = {
+  reset: ['Luôn có cách để tiếp tục.', 'Một mật khẩu mới.', 'Tiếp tục hành trình.', 'Bảo vệ tài khoản và trở lại học tập cùng CodePart.'],
+  verify: ['Chỉ còn một bước nữa.', 'Xác thực email.', 'Sẵn sàng khám phá.', 'Hoàn tất xác thực để bắt đầu hành trình học lập trình cùng CodePart.'],
   login: ['Mỗi ngày một bước tiến.', 'Tiếp tục hành trình', 'chinh phục lập trình.', 'Thực hành, khám phá và phát triển kỹ năng của bạn cùng CodePart.'],
   register: ['Một khởi đầu, nhiều khả năng.', 'Bắt đầu hôm nay.', 'Tự tin viết ngày mai.', 'Cùng học hỏi và biến những ý tưởng đầu tiên thành dòng code của riêng bạn.'],
   forgot: ['Luôn có cách để tiếp tục.', 'Một bước nhỏ để', 'trở lại hành trình.', 'Khôi phục mật khẩu và tiếp tục khám phá thế giới lập trình cùng CodePart.'],

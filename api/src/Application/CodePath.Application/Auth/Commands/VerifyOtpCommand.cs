@@ -46,7 +46,7 @@ internal sealed class VerifyOtpCommandHandler : IRequestHandler<VerifyOtpCommand
 
         var user = await _usersDbContext.GetByEmailAsync(normalizedEmail, cancellationToken);
         if (user is null)
-            return Result<string>.Failure("User not found.", ErrorCodes.NotFound);
+            return Result<string>.Failure("Mã xác thực không hợp lệ hoặc đã hết hạn.", ErrorCodes.AuthOtpInvalid);
 
         user.VerifyEmail(_timeProvider.GetUtcNow().UtcDateTime);
         await _usersDbContext.SaveChangesAsync(cancellationToken);

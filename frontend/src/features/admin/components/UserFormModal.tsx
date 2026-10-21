@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { X, UserPlus, Save, GraduationCap, UserCheck } from 'lucide-react';
 import type { AdminUserItem } from '../types/admin.types';
 import type { Role, UserStatus } from '../../auth/types/auth.types';
@@ -50,6 +50,11 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
 
     if (!email.trim() || !email.trim().toLowerCase().endsWith('@hanu.edu.vn')) {
       setError('Email trường bắt buộc phải có đuôi @hanu.edu.vn');
+      return;
+    }
+
+    if (role === 'Student' && !identifier.trim()) {
+      setError('Vui lòng nhập mã sinh viên (MSSV).');
       return;
     }
 
@@ -271,7 +276,7 @@ const UserFormDialog: React.FC<Omit<UserFormModalProps, 'isOpen'>> = ({
               className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-xs cursor-pointer transition-all flex items-center gap-1.5"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{isEditing ? 'Lưu thay đổi' : (fixedRole === 'Teacher' ? 'Thêm giáo viên' : 'Tạo người dùng')}</span>
+              <span>{isEditing ? 'Lưu thay đổi' : (fixedRole === 'Teacher' ? 'Thêm giáo viên' : fixedRole === 'Student' ? 'Thêm sinh viên' : 'Tạo người dùng')}</span>
             </button>
           </div>
         </form>
@@ -301,3 +306,5 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
     />
   );
 };
+
+

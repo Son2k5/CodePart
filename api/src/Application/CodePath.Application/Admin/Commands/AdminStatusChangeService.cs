@@ -6,6 +6,7 @@ using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auditing.Entities;
 using CodePath.Domain.Auditing.Enums;
 using CodePath.Shared.Kernel.Common;
+using CodePath.Shared.Kernel.Enums;
 
 namespace CodePath.Application.Admin.Commands;
 
@@ -52,6 +53,7 @@ internal sealed class AdminStatusChangeService
             var previousStatus = target.Status;
             var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
             if (requestedAction == AdminStatusAction.ApproveTeacher
+                && target.Role == UserRole.Teacher
                 && !target.EmailVerifiedAt.HasValue)
             {
                 return Result<AdminUserStatusChangeDto>.Failure(
@@ -107,8 +109,13 @@ internal sealed class AdminStatusChangeService
 
     private static AuditAction Approve(Domain.Users.Entities.User user, DateTime utcNow)
     {
-        user.ApproveTeacher(utcNow);
-        return AuditAction.TeacherApproved;
+        if (user.Role == UserRole.Teacher)
+        {
+            user.ApproveTeacher(utcNow);
+            return AuditAction.TeacherApproved;
+        }
+        user.ApproveStudent(utcNow);
+        return AuditAction.StudentApproved;
     }
 
     private static AuditAction Enable(Domain.Users.Entities.User user, DateTime utcNow)
@@ -119,8 +126,13 @@ internal sealed class AdminStatusChangeService
 
     private static AuditAction Reject(Domain.Users.Entities.User user, DateTime utcNow)
     {
-        user.RejectTeacher(utcNow);
-        return AuditAction.TeacherRejected;
+        if (user.Role == UserRole.Teacher)
+        {
+            user.RejectTeacher(utcNow);
+            return AuditAction.TeacherRejected;
+        }
+        user.RejectStudent(utcNow);
+        return AuditAction.StudentRejected;
     }
 
     private static AuditAction Disable(Domain.Users.Entities.User user, Guid actorId, DateTime utcNow)

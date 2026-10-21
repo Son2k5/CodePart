@@ -63,7 +63,7 @@ public sealed class Judge0CodeExecutor(HttpClient http, IOptions<JudgeOptions> o
                 var runtime = r.TryGetProperty("time", out var t) && double.TryParse(t.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) ? (int)Math.Ceiling(seconds * 1000) : 0;
                 var verdict = status switch { 3 => Verdict.Accepted, 4 => Verdict.WrongAnswer, 5 => Verdict.TimeLimitExceeded, 6 => Verdict.CompileError, >= 7 and <= 12 => Verdict.RuntimeError, _ => Verdict.InternalError };
                 if (memory > limits.MemoryLimitMb * 1024) verdict = Verdict.MemoryLimitExceeded;
-                return new(verdict, output, JudgeRules.Clip(error), runtime, memory);
+                return new(verdict, output, JudgeSanitizer.Sanitize(error), runtime, memory);
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return new(Verdict.InternalError, null, "Execution service timed out.", 0, 0); }

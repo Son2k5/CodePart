@@ -29,9 +29,9 @@ public static class JudgeRules
         return weight == 0 ? 0 : decimal.Round(problem.Points * (decimal)problem.TestCases.Where(t => passed.Contains(t.Id)).Sum(t => t.Weight) / weight, 2);
     }
     public static TestDto StudentResult(SubmissionResult r) => r.IsSample
-        ? new(r.TestCaseId, r.Index, true, r.Verdict.ToString(), r.RuntimeMs, r.MemoryKb, r.Input, r.ExpectedOutput, r.ActualOutput, r.ErrorMessage)
+        ? new(r.TestCaseId, r.Index, true, r.Verdict.ToString(), r.RuntimeMs, r.MemoryKb, r.Input, r.ExpectedOutput, r.ActualOutput, JudgeSanitizer.Sanitize(r.ErrorMessage))
         : new(null, r.Index, false, r.Verdict.ToString(), r.RuntimeMs);
     public static SubmissionDto ToDto(Submission s, bool source = false) => new(s.Id, s.ProblemId, s.Language,
         s.Status.ToString(), s.PassedCount, s.TotalCount, s.Score, s.AwardedPoints, s.MaxRuntimeMs, s.MaxMemoryKb,
-        s.CompileOutput, s.CreatedAt, s.FinishedAt, s.Results.OrderBy(r => r.Index).Select(StudentResult).ToArray(), source ? s.SourceCode : null);
+        JudgeSanitizer.Sanitize(s.CompileOutput), s.CreatedAt, s.FinishedAt, s.Results.OrderBy(r => r.Index).Select(StudentResult).ToArray(), source ? s.SourceCode : null);
 }

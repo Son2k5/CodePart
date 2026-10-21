@@ -1,3 +1,4 @@
+using CodePath.Application.Admin.Abstractions;
 using CodePath.Application.Admin.Dtos;
 using CodePath.Shared.Kernel.Common;
 using FluentValidation;
@@ -19,6 +20,11 @@ public sealed record DisableUserCommand(
     Guid ActorId,
     Guid UserId,
     string? IpAddress) : IRequest<Result<AdminUserStatusChangeDto>>;
+
+public sealed record DeleteUserCommand(
+    Guid ActorId,
+    Guid UserId,
+    string? IpAddress) : IRequest<Result<bool>>;
 
 public sealed class ApproveTeacherCommandValidator : AbstractValidator<ApproveTeacherCommand>
 {
@@ -43,6 +49,17 @@ public sealed class RejectTeacherCommandValidator : AbstractValidator<RejectTeac
 public sealed class DisableUserCommandValidator : AbstractValidator<DisableUserCommand>
 {
     public DisableUserCommandValidator()
+    {
+        RuleFor(command => command.ActorId).NotEmpty();
+        RuleFor(command => command.UserId).NotEmpty();
+        RuleFor(command => command.IpAddress).MaximumLength(45);
+    }
+}
+
+
+public sealed class DeleteUserCommandValidator : AbstractValidator<DeleteUserCommand>
+{
+    public DeleteUserCommandValidator()
     {
         RuleFor(command => command.ActorId).NotEmpty();
         RuleFor(command => command.UserId).NotEmpty();
@@ -102,4 +119,18 @@ internal sealed class DisableUserCommandHandler
             AdminStatusAction.DisableUser,
             request.IpAddress,
             cancellationToken);
+}
+
+
+internal sealed class DeleteUserCommandHandler
+    : IRequestHandler<DeleteUserCommand, Result<bool>>
+{
+    private readonly IAdminDbContext _db;
+
+    public DeleteUserCommandHandler(IAdminDbContext db) => _db = db;
+
+    public Task<Result<bool>> Handle(
+        DeleteUserCommand request,
+        CancellationToken cancellationToken) =>
+        _db.ExecuteInTransactionAsync(token => _db.DeleteUserAsync(request.ActorId, request.UserId, request.IpAddress, token), cancellationToken);
 }

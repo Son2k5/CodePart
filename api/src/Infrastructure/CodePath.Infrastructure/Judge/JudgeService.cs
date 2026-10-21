@@ -109,13 +109,13 @@ public sealed class JudgeService(JudgeDbContext db, IJudgeAccess access, ICodeEx
         if (r.CustomInput != null)
         {
             var result = await executor.Execute(r.Language, r.SourceCode, r.CustomInput, new(p.TimeLimitMs, p.MemoryLimitMb), ct);
-            results.Add(new(null, 1, true, result.Verdict.ToString(), result.RuntimeMs, result.MemoryKb, r.CustomInput, null, result.Output, result.Error));
+            results.Add(new(null, 1, true, result.Verdict.ToString(), result.RuntimeMs, result.MemoryKb, r.CustomInput, null, result.Output, JudgeSanitizer.Sanitize(result.Error)));
         }
         else foreach (var t in tests)
         {
             var result = await executor.Execute(r.Language, r.SourceCode, t.Input, new(p.TimeLimitMs, p.MemoryLimitMb), ct);
             var verdict = result.Verdict == Verdict.Accepted && !JudgeRules.Equal(t.ExpectedOutput, result.Output ?? "", p.ComparisonMode) ? Verdict.WrongAnswer : result.Verdict;
-            results.Add(new(t.Id, t.Order, true, verdict.ToString(), result.RuntimeMs, result.MemoryKb, t.Input, t.ExpectedOutput, result.Output, result.Error));
+            results.Add(new(t.Id, t.Order, true, verdict.ToString(), result.RuntimeMs, result.MemoryKb, t.Input, t.ExpectedOutput, result.Output, JudgeSanitizer.Sanitize(result.Error)));
         }
         if (redis != null)
         {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CodePath.Shared.Kernel.Common;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -6,6 +7,14 @@ namespace CodePath.Api.Extensions;
 
 public static class ResultExtensions
 {
+    private static string ResolveTraceId()
+    {
+        return Activity.Current?.TraceId.ToString()
+            ?? Activity.Current?.Id
+            ?? (new HttpContextAccessor().HttpContext?.TraceIdentifier)
+            ?? Guid.NewGuid().ToString("N");
+    }
+
     public static Microsoft.AspNetCore.Http.IResult ToHttpResult<T>(this Result<T> result)
     {
         if (result.IsSuccess)
@@ -19,8 +28,21 @@ public static class ResultExtensions
             return Results.Ok(result.Value);
         }
 
-        if (result.ErrorCode is "SESSION_IDLE_TIMEOUT" or "SESSION_EXPIRED")
-            return Results.Json(new { code = result.ErrorCode }, statusCode: StatusCodes.Status401Unauthorized);
+        var traceId = ResolveTraceId();
+
+        if (result.ErrorCode is ErrorCodes.SessionIdleTimeout or ErrorCodes.SessionExpired or "SESSION_IDLE_TIMEOUT" or "SESSION_EXPIRED")
+        {
+            var sessionProblem = new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Phiên đăng nhập đã hết hạn",
+                Detail = "Phiên làm việc của bạn đã hết hạn. Vui lòng đăng nhập lại.",
+                Type = "https://httpstatuses.com/401"
+            };
+            sessionProblem.Extensions["code"] = result.ErrorCode;
+            sessionProblem.Extensions["traceId"] = traceId;
+            return Results.Problem(sessionProblem);
+        }
 
         if (result.ErrorCode == ErrorCodes.ValidationError && result.ValidationErrors.Count > 0)
         {
@@ -28,37 +50,31 @@ public static class ResultExtensions
                 .GroupBy(e => e.PropertyName)
                 .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
 
-            return Results.ValidationProblem(
-                errorsDict,
-                title: "Dữ liệu không hợp lệ.",
-                statusCode: StatusCodes.Status400BadRequest);
+            var validationProblem = new HttpValidationProblemDetails(errorsDict)
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Dữ liệu không hợp lệ.",
+                Detail = "Một hoặc nhiều trường dữ liệu không vượt qua kiểm tra tính hợp lệ.",
+                Type = "https://httpstatuses.com/400"
+            };
+            validationProblem.Extensions["code"] = ErrorCodes.ValidationError;
+            validationProblem.Extensions["traceId"] = traceId;
+
+            return Results.Problem(validationProblem);
         }
 
-        var (statusCode, title) = result.ErrorCode switch
-        {
-            "TOPIC_LOCKED" or "NOT_ENROLLED" => (403, "Learning access denied"),
-            "CLASS_NOT_FOUND" or "ENROLLMENT_NOT_FOUND" => (404, "Không tìm thấy dữ liệu"),
-            "CLASS_FULL" or "ALREADY_ENROLLED" or "CLASS_HAS_STUDENTS" or "CLASS_CONCURRENCY_CONFLICT" => (409, "Xung đột dữ liệu"),
-            ErrorCodes.TooManyRequests => (StatusCodes.Status429TooManyRequests, "Too many requests"),
-            ErrorCodes.NotFound => (StatusCodes.Status404NotFound, "Không tìm thấy dữ liệu"),
-            ErrorCodes.Unauthorized => (StatusCodes.Status401Unauthorized, "Không được phép truy cập"),
-            ErrorCodes.Forbidden or ErrorCodes.AccountUnverified or ErrorCodes.AccountPending or ErrorCodes.AccountRejected or ErrorCodes.AccountDisabled
-                => (StatusCodes.Status403Forbidden, "Truy cập bị từ chối"),
-            "SUBMISSION_IN_PROGRESS" => (409, "Submission in progress"),
-            ErrorCodes.Conflict => (StatusCodes.Status409Conflict, "Xung đột dữ liệu"),
-            ErrorCodes.InfraError => (StatusCodes.Status503ServiceUnavailable, "Dịch vụ hạ tầng tạm thời gián đoạn"),
-            _ => (StatusCodes.Status400BadRequest, "Yêu cầu không hợp lệ")
-        };
+        var (statusCode, title, safeMessage) = ErrorCatalog.GetDetails(result.ErrorCode, result.Error);
 
         var problem = new ProblemDetails
         {
             Status = statusCode,
             Title = title,
-            Detail = result.Error,
+            Detail = safeMessage,
             Type = $"https://httpstatuses.com/{statusCode}"
         };
 
         problem.Extensions["code"] = result.ErrorCode ?? ErrorCodes.BadRequest;
+        problem.Extensions["traceId"] = traceId;
 
         return Results.Problem(problem);
     }

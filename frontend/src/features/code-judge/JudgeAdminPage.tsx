@@ -5,7 +5,6 @@ import Editor from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { judgeApi, judgeError, problemScope, scopeParams, type Problem, type Test, type Submission } from './api';
 import { ScopePicker } from './ScopePicker';
-import './JudgePage';
 import './judge.css';
 
 const empty: Partial<Problem> = { title: '', description: '', difficulty: 'Easy', timeLimitMs: 2000, memoryLimitMb: 256, points: 100, comparisonMode: 0, courseId: null,

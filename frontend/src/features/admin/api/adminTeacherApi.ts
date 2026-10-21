@@ -1,5 +1,5 @@
-import axios from 'axios';
 import { axiosInstance } from '../../../lib/axios';
+import { getErrorMessage } from '../../../lib/errorService';
 import type { AdminUserItem } from '../types/admin.types';
 
 export interface TeacherFilter {
@@ -42,8 +42,12 @@ export const adminTeacherApi = {
   },
   async update(id: string, d: TeacherFormData) { return (await axiosInstance.put(`/admin/teachers/${id}`, profile(d))).data; },
   async action(id: string, action: TeacherAction) { return (await axiosInstance.post(`/admin/users/${id}/${action}`)).data; },
+  async delete(id: string) { return (await axiosInstance.delete(`/admin/teachers/${id}`)).data; },
   async bulk(userIds: string[], action: 'approve' | 'disable') {
     return (await axiosInstance.post<number>(`/admin/teachers/bulk-${action}`, { userIds })).data;
+  },
+  async bulkDelete(userIds: string[]) {
+    return (await axiosInstance.post<number>('/admin/teachers/bulk-delete', { userIds })).data;
   },
   async export(params: TeacherFilter) {
     const { page: _page, pageSize: _pageSize, ...filters } = params;
@@ -56,14 +60,5 @@ export const adminTeacherApi = {
 };
 
 export function teacherError(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    const data = error.response?.data;
-    if (data?.errors) return Object.values(data.errors).flat().join(' ');
-    if (status && status >= 500) {
-      return data?.title || 'Đã có lỗi xảy ra từ máy chủ. Vui lòng thử lại sau.';
-    }
-    return data?.detail || data?.title || 'Không thể kết nối máy chủ. Vui lòng thử lại.';
-  }
-  return error instanceof Error ? error.message : 'Thao tác thất bại. Vui lòng thử lại.';
+  return getErrorMessage(error, 'Thao tác thất bại. Vui lòng thử lại.');
 }

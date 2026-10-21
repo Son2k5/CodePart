@@ -4,7 +4,7 @@ import { judgeApi } from './api';
 
 export function ClassProblemsPanel({ id, kind, manage = false }: { id: string; kind: 'class' | 'course'; manage?: boolean }) {
   const scope = `${kind}:${id}`;
-  const q = useQuery({ queryKey: [manage ? 'judge-admin-list' : 'judge-list', 1, scope], queryFn: () => judgeApi.list(manage, 1, scope), refetchInterval: manage ? false : 30000 });
+  const q = useQuery({ queryKey: [manage ? 'judge-admin-list' : 'judge-list', 1, scope], queryFn: () => judgeApi.list(manage, 1, scope) });
   return <section className="portal-card" style={{ margin: '20px 0', padding: 20 }}>
     <h2>Bài tập lập trình</h2><p>{manage ? 'Tạo và xuất bản bài tập cho lớp. Học sinh làm bài trên khung coding chung.' : 'Bài tập giáo viên đã đăng cho lớp. Chọn bài để viết code, chạy thử và nộp.'}</p>
     <Link to={`${manage ? '/manage/problems' : '/problems'}?scope=${encodeURIComponent(scope)}`}>{manage ? 'Quản lý / đăng bài cho lớp →' : 'Mở danh sách bài tập →'}</Link>

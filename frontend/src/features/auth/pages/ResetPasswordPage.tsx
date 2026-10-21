@@ -1,105 +1,43 @@
-import React from 'react';
-import { useForm } from 'react-hook-form';
+﻿import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { resetPasswordSchema } from '../schemas/authSchemas';
 import type { ResetPasswordInput } from '../schemas/authSchemas';
 import { useResetPassword } from '../hooks/useAuth';
-import { AuthLayout } from '../components/AuthLayout';
-import { PasswordInput } from '../components/PasswordInput';
+import { BrightAuthLayout } from '../components/BrightAuthLayout';
+import { AuthField } from '../components/AuthField';
 
 function extractTokenFromLocation(): string {
-  // Backend sends link as /reset-password#token=<64hex> (see EmailSender).
-  // Token is in URL fragment so it never hits the server on link open.
-  const hash = window.location.hash || '';
-  const hashMatch = hash.match(/token=([A-Fa-f0-9]{64})/);
-  if (hashMatch) return hashMatch[1];
-  const params = new URLSearchParams(window.location.search);
-  return params.get('token') ?? '';
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  const query = new URLSearchParams(window.location.search);
+  return fragment.get('token') ?? query.get('token') ?? '';
 }
 
-export const ResetPasswordPage: React.FC = () => {
+export const ResetPasswordPage = () => {
   const token = extractTokenFromLocation();
-
   const { register, handleSubmit, formState: { errors } } = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { token, newPassword: '', confirmPassword: '' }
+    defaultValues: { token, newPassword: '', confirmPassword: '' },
   });
-
   const { mutate: resetPassword, isPending } = useResetPassword();
-
-  const onSubmit = (data: ResetPasswordInput) => {
-    const { confirmPassword, ...rest } = data;
-    void confirmPassword;
-    resetPassword({ token: rest.token, newPassword: rest.newPassword });
-  };
-
-  if (!token) {
-    return (
-      <AuthLayout
-        title="Invalid Reset Link"
-        subtitle="Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."
-      >
-        <div className="space-y-6 mt-4 text-center">
-          <p className="text-sm text-gray-600 leading-relaxed">
-            Vui lòng mở lại liên kết trong email (dạng <span className="font-mono">/reset-password#token=...</span>),
-            hoặc yêu cầu gửi lại email đặt lại mật khẩu.
-          </p>
-          <div className="pt-4 flex flex-col gap-3">
-            <Link
-              to="/forgot-password"
-              className="w-full flex items-center justify-center py-3.5 px-4 bg-[#1a1a1a] hover:bg-black text-white font-semibold text-sm rounded-full shadow-md transition-all duration-200"
-            >
-              Request New Link
-            </Link>
-            <Link to="/login" className="text-[13px] font-medium text-gray-500 hover:text-slate-900">
-              Back to Login
-            </Link>
-          </div>
-        </div>
-      </AuthLayout>
-    );
-  }
+  const validToken = /^[a-fA-F0-9]{64}$/.test(token);
 
   return (
-    <AuthLayout
-      title="Create New Password"
-      subtitle="Enter your new password below."
-    >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
-        <input type="hidden" {...register('token')} />
-        {errors.token && (
-          <p className="text-xs text-red-500 text-center" role="alert">{errors.token.message}</p>
-        )}
-
-        <PasswordInput
-          label="New Password"
-          placeholder="••••••••"
-          {...register('newPassword')}
-          error={errors.newPassword?.message}
-        />
-
-        <PasswordInput
-          label="Confirm Password"
-          placeholder="••••••••"
-          {...register('confirmPassword')}
-          error={errors.confirmPassword?.message}
-        />
-
-        <div className="pt-4">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full flex items-center justify-center py-3.5 px-4 bg-[#1a1a1a] hover:bg-black disabled:bg-gray-400 text-white font-semibold text-sm rounded-full shadow-md transition-all duration-200"
-          >
-            {isPending ? (
-              <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-            ) : (
-              <span>Reset Password</span>
-            )}
-          </button>
-        </div>
-      </form>
-    </AuthLayout>
+    <BrightAuthLayout variant="reset" title={validToken ? 'Tạo mật khẩu mới' : 'Liên kết không hợp lệ'}
+      subtitle={validToken ? 'Đặt mật khẩu mới để bảo vệ tài khoản của bạn.' : 'Vui lòng mở liên kết trong email hoặc yêu cầu một liên kết khôi phục mới.'}>
+      {validToken ? (
+        <form onSubmit={handleSubmit(({ token, newPassword }) => resetPassword({ token, newPassword }))} className="auth-form" noValidate aria-busy={isPending}>
+          <input type="hidden" {...register('token')} />
+          {errors.token && <p className="auth-error" role="alert">{errors.token.message}</p>}
+          <AuthField label="Mật khẩu mới" type="password" autoComplete="new-password" placeholder="Nhập mật khẩu mới" {...register('newPassword')} error={errors.newPassword?.message} />
+          <p className="auth-hint">Mật khẩu từ 12 đến 128 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.</p>
+          <AuthField label="Xác nhận mật khẩu" type="password" autoComplete="new-password" placeholder="Nhập lại mật khẩu mới" {...register('confirmPassword')} error={errors.confirmPassword?.message} />
+          <button type="submit" disabled={isPending} className="auth-submit">{isPending ? 'Đang lưu mật khẩu…' : <>Đặt lại mật khẩu <ArrowRight size={17} /></>}</button>
+          <Link to="/forgot-password" className="auth-link auth-recovery-link">Liên kết hết hạn? Yêu cầu liên kết mới</Link>
+        </form>
+      ) : <Link to="/forgot-password" className="auth-submit">Yêu cầu liên kết mới <ArrowRight size={17} /></Link>}
+      <Link to="/login" className="auth-link auth-back"><ArrowLeft size={16} /> Quay lại đăng nhập</Link>
+    </BrightAuthLayout>
   );
 };

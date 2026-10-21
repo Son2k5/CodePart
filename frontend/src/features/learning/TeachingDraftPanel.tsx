@@ -1,19 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import { axiosInstance as api } from '../../lib/axios';
+import { getErrorMessage } from '../../lib/errorService';
 import { RagSources, type RagReference } from '../ai-assistant/RagSources';
 
 type Test = { input: string; expectedOutput: string; isSample: boolean };
 type Quiz = { question: string; choices: string[]; correctIndex: number; explanation: string };
 type Content = { title: string; description: string; referenceSolution: string; tests: Test[]; quiz: Quiz[]; sourceIds: string[] };
 type Draft = { id: string; kind: string; language: string; content: string; sources: string; status: string; validation: string; rowVersion: string };
-const errors: Record<string, string> = { INSUFFICIENT_CONTEXT: 'Chưa có học liệu phù hợp. Hãy công bố và xử lý bài học trước.',
-  INVALID_DRAFT: 'Bản nháp chưa hợp lệ. Bài lập trình cần 10–15 test, trong đó 1–2 sample; quiz cần 3–5 câu hỏi với bốn lựa chọn.',
-  CONTEXT_CHANGED: 'Học liệu đã thay đổi. Hãy tạo bản nháp mới từ phiên bản hiện tại.', VERIFY_REQUIRED: 'Cần kiểm chứng lời giải và test trước khi duyệt.',
-  JUDGE_UNAVAILABLE: 'Dịch vụ chấm code chưa sẵn sàng cho ngôn ngữ này.', JUDGE_TIMEOUT: 'Kiểm chứng vượt thời gian cho phép. Hãy kiểm tra dịch vụ chấm và thử lại.', CONFLICT: 'Bản nháp đã được sửa. Hãy tải lại danh sách.',
-  RATE_LIMIT: 'Đã đến giới hạn lượt. Vui lòng thử lại sau.', RAG_DISABLED: 'Dịch vụ trợ giảng chưa được bật.', DRAFT_GENERATION_FAILED: 'Chưa tạo được bản nháp hợp lệ. Vui lòng thử lại.' };
-function errorText(e: unknown) { return axios.isAxiosError(e) ? errors[e.response?.data?.code] ?? 'Không thực hiện được. Kiểm tra dịch vụ và thử lại.' : 'Không thực hiện được thao tác.'; }
+function errorText(e: unknown) { return getErrorMessage(e, 'Không thực hiện được. Kiểm tra dịch vụ và thử lại.'); }
 
 export function TeachingDraftPanel({ topicId }: { topicId: string }) {
   const [kind, setKind] = useState('exercise'); const [language, setLanguage] = useState('python');

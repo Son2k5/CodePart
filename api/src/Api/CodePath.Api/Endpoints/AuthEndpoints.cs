@@ -186,20 +186,13 @@ public static class AuthEndpoints
         {
             if (!IsCookieRequestOriginAllowed(httpContext, config))
             {
-                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, detail: "The request origin is not allowed.");
+                return Result<object>.Failure("Yêu cầu không được phép do sai nguồn gốc (origin).", ErrorCodes.Forbidden).ToHttpResult();
             }
 
             var tokenStr = httpContext.Request.Cookies[RefreshTokenCookieName];
             if (string.IsNullOrWhiteSpace(tokenStr))
             {
-                return Results.Problem(new ProblemDetails
-                {
-                    Status = StatusCodes.Status401Unauthorized,
-                    Title = "Không được phép truy cập",
-                    Detail = "Refresh token không được để trống.",
-                    Type = "https://httpstatuses.com/401",
-                    Extensions = { ["code"] = ErrorCodes.Unauthorized }
-                });
+                return Result<object>.Failure("Phiên làm việc không hợp lệ hoặc thiếu thông tin xác thực.", ErrorCodes.Unauthorized).ToHttpResult();
             }
 
             var result = await sender.Send(new RefreshTokenCommand(tokenStr, GetClientIp(httpContext)));
@@ -228,7 +221,7 @@ public static class AuthEndpoints
         {
             if (!IsCookieRequestOriginAllowed(httpContext, config))
             {
-                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, detail: "The request origin is not allowed.");
+                return Result<object>.Failure("Yêu cầu không được phép do sai nguồn gốc (origin).", ErrorCodes.Forbidden).ToHttpResult();
             }
 
             var jti = httpContext.User.GetJti();
@@ -257,7 +250,7 @@ public static class AuthEndpoints
             var userId = httpContext.User.GetUserId();
             if (userId is null)
             {
-                return Results.Unauthorized();
+                return Result<object>.Failure("Bạn cần đăng nhập để thực hiện thao tác này.", ErrorCodes.Unauthorized).ToHttpResult();
             }
 
             await sender.Send(new LogoutAllCommand(
@@ -277,12 +270,22 @@ public static class AuthEndpoints
             var userId = httpContext.User.GetUserId();
 
             if (userId is null)
-                return Results.Unauthorized();
+                return Result<object>.Failure("Bạn cần đăng nhập để thực hiện thao tác này.", ErrorCodes.Unauthorized).ToHttpResult();
 
             var result = await sender.Send(new GetCurrentUserQuery(userId.Value));
             return result.ToHttpResult();
         })
         .WithName("GetCurrentUser")
+        .RequireAuthorization("ActiveUser");
+
+        group.MapPut("/me", async (UpdateProfileRequest req, HttpContext httpContext, ISender sender, CancellationToken ct) =>
+        {
+            var userId = httpContext.User.GetUserId();
+            if (userId is null) return Results.Unauthorized();
+            var result = await sender.Send(new UpdateProfileCommand(userId.Value, req.FullName), ct);
+            return result.ToHttpResult();
+        })
+        .WithName("UpdateCurrentUser")
         .RequireAuthorization("ActiveUser");
 
         return app;

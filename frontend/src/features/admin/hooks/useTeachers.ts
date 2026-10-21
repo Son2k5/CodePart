@@ -28,5 +28,7 @@ export function useTeacherMutations() {
   const update = useMutation({ mutationFn: ({ id, data }: { id: string; data: TeacherFormData }) => adminTeacherApi.update(id, data), onSuccess });
   const action = useMutation({ mutationFn: ({ id, action }: { id: string; action: TeacherAction }) => adminTeacherApi.action(id, action), onSuccess });
   const bulk = useMutation({ mutationFn: ({ ids, action }: { ids: string[]; action: 'approve' | 'disable' }) => adminTeacherApi.bulk(ids, action), onSuccess });
-  return { create, update, action, bulk, busy: create.isPending || update.isPending || action.isPending || bulk.isPending };
+  const remove = useMutation({ mutationFn: (id: string) => adminTeacherApi.delete(id), onSuccess });
+  const bulkDelete = useMutation({ mutationFn: (ids: string[]) => adminTeacherApi.bulkDelete(ids), onSuccess });
+  return { create, update, action, bulk, remove, bulkDelete, busy: create.isPending || update.isPending || action.isPending || bulk.isPending || remove.isPending || bulkDelete.isPending };
 }

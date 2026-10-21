@@ -2,16 +2,17 @@ using CodePath.Api.Extensions;
 using CodePath.Application.Ai;
 using CodePath.Application.Judge;
 using CodePath.Application.Learning;
+using CodePath.Shared.Kernel.Common;
 namespace CodePath.Api.Endpoints;
 
 public static class RagEndpoints
 {
     private static Actor Actor(HttpContext h) => new(h.User.GetUserId()!.Value, h.User.IsInRole("Admin"), h.User.IsInRole("Teacher"));
-    private static async Task<IResult> Execute(Func<Task<object>> action)
+    private static async Task<Microsoft.AspNetCore.Http.IResult> Execute(Func<Task<object>> action)
     {
         try { return Results.Ok(await action()); }
-        catch (AiPolicyException e) { return Results.Json(new { code = e.Code }, statusCode: e.Status); }
-        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException) { return Results.Json(new { code = "CONFLICT" }, statusCode: 409); }
+        catch (AiPolicyException e) { return Result<object>.Failure(ErrorCatalog.GetSafeMessage(e.Code), e.Code).ToHttpResult(); }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException) { return Result<object>.Failure("Dữ liệu đã bị thay đổi bởi thao tác khác. Vui lòng tải lại trang.", ErrorCodes.Conflict).ToHttpResult(); }
     }
     public static void MapRagEndpoints(this IEndpointRouteBuilder app)
     {

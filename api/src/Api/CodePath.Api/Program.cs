@@ -26,7 +26,11 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 40 * 1024 * 1024);
+builder.WebHost.ConfigureKestrel(o =>
+{
+    o.Limits.MaxRequestBodySize = 40 * 1024 * 1024;
+    o.AddServerHeader = false;
+});
 
 if (builder.Environment.IsDevelopment())
 {
@@ -53,6 +57,7 @@ if (Directory.Exists(secretsDirectory))
     builder.Configuration.AddInMemoryCollection(fileSecrets);
 }
 
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSharedInfrastructure(builder.Configuration);
 
 var jwtSecret = builder.Configuration["Jwt:SigningKey"];
@@ -447,28 +452,47 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 }).WithMetadata(new CodePath.Api.Middleware.SkipActivityTrackingAttribute())
 .ExcludeFromDescription();
 
-app.MapGet("/health/redis", async (IRedisHealthProbe probe, IWebHostEnvironment env, CancellationToken ct) =>
+app.MapGet("/health/redis", async (IRedisHealthProbe probe, HttpContext httpContext, CancellationToken ct) =>
 {
     var health = await probe.CheckAsync(ct);
+    var traceId = httpContext.TraceIdentifier;
     if (!health.IsConnected)
     {
-        return Results.Problem(
-            detail: env.IsDevelopment() ? (health.Error ?? "Cannot connect to Redis server.") : "Cannot connect to cache service.",
-            statusCode: StatusCodes.Status503ServiceUnavailable);
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Title = "Dịch vụ tạm thời gián đoạn",
+            Detail = "Không thể kết nối đến dịch vụ lưu trữ đệm.",
+            Type = "https://httpstatuses.com/503",
+            Instance = httpContext.Request.Path
+        };
+        problem.Extensions["code"] = ErrorCodes.InfraError;
+        problem.Extensions["traceId"] = traceId;
+        return Results.Problem(problem);
     }
 
-    return health.RoundTripSuccess
-        ? Results.Ok(new
+    if (!health.RoundTripSuccess)
+    {
+        var problem = new ProblemDetails
         {
-            service = "Redis",
-            status = "healthy",
-            roundTripSuccess = true,
-            latencyMs = health.LatencyMs,
-            endpoint = env.IsDevelopment() ? health.Endpoint : "protected"
-        })
-        : Results.Problem(
-            detail: env.IsDevelopment() ? (health.Error ?? "Redis round-trip verification failed (value mismatch).") : "Cache verification failed.",
-            statusCode: StatusCodes.Status500InternalServerError);
+            Status = StatusCodes.Status500InternalServerError,
+            Title = "Đã có lỗi xảy ra ở máy chủ",
+            Detail = "Kiểm tra tính toàn vẹn dịch vụ lưu trữ đệm không thành công.",
+            Type = "https://httpstatuses.com/500",
+            Instance = httpContext.Request.Path
+        };
+        problem.Extensions["code"] = ErrorCodes.InternalServerError;
+        problem.Extensions["traceId"] = traceId;
+        return Results.Problem(problem);
+    }
+
+    return Results.Ok(new
+    {
+        service = "Redis",
+        status = "healthy",
+        roundTripSuccess = true,
+        latencyMs = health.LatencyMs
+    });
 })
 .WithName("CheckRedisHealth")
 .WithTags("Health")

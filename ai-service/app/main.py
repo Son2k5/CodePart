@@ -33,13 +33,25 @@ async def lifespan(app):
         yield
         if app.state.cache: await app.state.cache.aclose()
 
-app = FastAPI(title='CodePath AI', version='1.0.0', lifespan=lifespan)
+is_dev = os.getenv('ENVIRONMENT', 'production').lower() in ('development', 'dev', 'local')
+app = FastAPI(
+    title='CodePath AI',
+    version='1.0.0',
+    lifespan=lifespan,
+    docs_url='/docs' if is_dev else None,
+    redoc_url='/redoc' if is_dev else None,
+    openapi_url='/openapi.json' if is_dev else None
+)
 service_key = APIKeyHeader(name='X-Service-Key', auto_error=False)
 DEADLINE_SECONDS = 19
 
 @app.exception_handler(RequestValidationError)
 async def invalid_context(request, exc):
     return JSONResponse({'code': 'INVALID_CONTEXT'}, status_code=422)
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc):
+    return JSONResponse({'code': 'AI_UNAVAILABLE'}, status_code=503)
 
 async def authenticate(x_service_key: str | None = Depends(service_key)):
     expected = os.getenv('SERVICE_API_KEY', '')

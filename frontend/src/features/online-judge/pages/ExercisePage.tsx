@@ -1,14 +1,12 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Group, Panel, Separator } from 'react-resizable-panels';
-import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { java } from '@codemirror/lang-java';
-import { cpp } from '@codemirror/lang-cpp';
 import { Play, Send, CheckCircle2, XCircle, Clock, Cpu, ChevronLeft } from 'lucide-react';
+
+const CodeMirror = lazy(() => import('@uiw/react-codemirror'));
 import { judgeApi } from '../api/judgeApi';
 import type { Exercise, RunResult, SubmitResult } from '../api/judgeApi';
+import { getErrorMessage } from '../../../lib/errorService';
 
 const LANGUAGES = [
   { id: 71, name: 'Python 3', value: 'python' },
@@ -36,6 +34,32 @@ export const ExercisePage = () => {
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [activeTab, setActiveTab] = useState<'testcases' | 'result'>('testcases');
+  const [editorExtensions, setEditorExtensions] = useState<unknown[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLang() {
+      let ext: unknown = null;
+      if (language.value === 'python') {
+        const { python } = await import('@codemirror/lang-python');
+        ext = python();
+      } else if (language.value === 'javascript') {
+        const { javascript } = await import('@codemirror/lang-javascript');
+        ext = javascript();
+      } else if (language.value === 'java') {
+        const { java } = await import('@codemirror/lang-java');
+        ext = java();
+      } else if (language.value === 'cpp') {
+        const { cpp } = await import('@codemirror/lang-cpp');
+        ext = cpp();
+      }
+      if (!cancelled) {
+        setEditorExtensions(ext ? [ext] : []);
+      }
+    }
+    void loadLang();
+    return () => { cancelled = true; };
+  }, [language.value]);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +77,7 @@ export const ExercisePage = () => {
         })
         .catch(err => {
           if (cancelled) return;
-          setError(err.message);
+          setError(getErrorMessage(err, 'Không thể tải bài tập.'));
           setLoading(false);
         });
     }
@@ -71,7 +95,7 @@ export const ExercisePage = () => {
       const result = await judgeApi.runCode(exercise.id, language.value, code, customInput);
       setRunResult(result);
     } catch (err: any) {
-      setExecutionError(err.response?.data?.detail || err.message);
+      setExecutionError(getErrorMessage(err, 'Không thể chạy mã nguồn.'));
     } finally {
       setIsRunning(false);
     }
@@ -88,7 +112,7 @@ export const ExercisePage = () => {
       const result = await judgeApi.submitCode(exercise.id, language.value, code);
       setSubmitResult(result);
     } catch (err: any) {
-      setExecutionError(err.response?.data?.detail || err.message);
+      setExecutionError(getErrorMessage(err, 'Không thể nộp bài.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -175,19 +199,16 @@ export const ExercisePage = () => {
                   </select>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <CodeMirror
-                    value={code}
-                    height="100%"
-                    theme="dark"
-                    extensions={
-                      language.value === 'python' ? [python()] :
-                      language.value === 'javascript' ? [javascript()] :
-                      language.value === 'java' ? [java()] :
-                      language.value === 'cpp' ? [cpp()] : []
-                    }
-                    onChange={(value) => setCode(value)}
-                    className="h-full text-base"
-                  />
+                  <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-400 font-mono text-sm">Đang tải trình soạn thảo…</div>}>
+                    <CodeMirror
+                      value={code}
+                      height="100%"
+                      theme="dark"
+                      extensions={editorExtensions as never}
+                      onChange={(value) => setCode(value)}
+                      className="h-full text-base"
+                    />
+                  </Suspense>
                 </div>
               </Panel>
 

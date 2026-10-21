@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns2, Eye, EyeOff, FileOutput, Filter, List, Megaphone, MoreHorizontal, Plus, RotateCcw, Search, Settings2, Users, UserCheck, Clock, Lock, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns2, Eye, EyeOff, FileOutput, Filter, List, Megaphone, MoreHorizontal, Plus, RotateCcw, Search, Settings2, Users, UserCheck, Clock, Lock, X, Trash2, Edit3 } from 'lucide-react';
 import { toast } from 'sonner';
-import { DEPARTMENTS, INITIAL_MOCK_USERS, calculateMockStats } from '../data/mockAdminData';
 import type { AdminUserItem } from '../types/admin.types';
 import { UserDetailModal } from '../components/UserDetailModal';
 import { UserFormModal } from '../components/UserFormModal';
 import '../styles/personnel.css';
 import { adminTeacherApi, teacherError, type TeacherFilter, type TeacherFormData } from '../api/adminTeacherApi';
 import { useTeachers, useTeacherStats, useTeacherDetail, useFaculties, useTeacherMutations, useDebouncedSearch } from '../hooks/useTeachers';
+import { adminStudentApi, studentError, type StudentFilter, type StudentFormData } from '../api/adminStudentApi';
+import { useStudents, useStudentStats, useStudentDetail, useStudentMutations } from '../hooks/useStudents';
 
 type PersonnelRole = 'Student' | 'Teacher';
 type ColumnId = 'code' | 'name' | 'gender' | 'birthday' | 'email' | 'department' | 'classes' | 'courses' | 'created' | 'phone' | 'status';
 type Column = { id: ColumnId; label: string; width: number; min: number };
 type Panel = 'scope' | 'columns' | 'filters' | 'more' | 'add' | null;
 const statusLabels: Record<AdminUserItem['status'], string> = { Active: 'Đang hoạt động', Pending: 'Chờ phê duyệt', Disabled: 'Đã khóa', Rejected: 'Đã từ chối' };
-const normalize = (value: string) => value.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 const dateLabel = (value: string) => new Date(value).toLocaleDateString('vi-VN');
 const avatarColors = ['#35b6cf', '#55bb70', '#9a7cf0', '#f58b53', '#ed7099', '#5b92d9'];
 const getColumns = (role: PersonnelRole): Column[] => [
@@ -48,10 +48,9 @@ const valueFor = (user: AdminUserItem, id: ColumnId): string | number => {
 };
 
 export function UserManagementPage({ role }: { role: PersonnelRole }) {
-  const roleLabel = role === 'Student' ? 'sinh viên' : 'giáo viên';
-  const initialUsers = useMemo(() => INITIAL_MOCK_USERS.filter((user) => user.role === role), [role]);
+  const isStudent = role === 'Student';
+  const roleLabel = isStudent ? 'sinh viên' : 'giáo viên';
   const columns = useMemo(() => getColumns(role), [role]);
-  const [mockUsers, setUsers] = useState(() => initialUsers.map((user) => ({ ...user })));
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState('');
   const [department, setDepartment] = useState('');
@@ -74,46 +73,81 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const selectAllRef = useRef<HTMLInputElement>(null);
   const resizeRef = useRef<{ id: ColumnId; start: number; width: number; min: number } | null>(null);
   const panelTrigger = useRef<HTMLElement | null>(null);
-  const live = role === 'Teacher';
+
   const search = useDebouncedSearch(query);
-  const filter: TeacherFilter = { page, pageSize, search, facultyId: department || undefined,
+  const filter = {
+    page,
+    pageSize,
+    search,
+    facultyId: department || undefined,
     status: status === 'ALL' ? undefined : status as AdminUserItem['status'],
-    sortBy: sort?.id === 'name' ? (sort.direction === 1 ? 'name_asc' : 'name_desc') : sort?.id === 'created' && sort.direction === 1 ? 'created_asc' : 'created_desc' };
-  const teachers = useTeachers(filter, live);
-  const teacherStats = useTeacherStats(live);
-  const faculties = useFaculties(live);
-  const detail = useTeacherDetail(live ? selectedUser?.id : undefined);
-  const mutations = useTeacherMutations();
-  const users = live ? teachers.data?.items ?? [] : mockUsers;
-  const stats = live ? { totalUsers: teacherStats.data?.totalTeachers ?? 0,
-    activeUsers: teacherStats.data?.activeTeachers ?? 0, pendingApprovals: teacherStats.data?.pendingApprovals ?? 0,
-    disabledUsers: teacherStats.data?.disabledTeachers ?? 0 } : calculateMockStats(users);
-  const statusCount = (key: string) => live ? ({ Active: teacherStats.data?.activeTeachers,
-    Pending: teacherStats.data?.pendingApprovals, Disabled: teacherStats.data?.disabledTeachers,
-    Rejected: teacherStats.data?.rejectedTeachers }[key] ?? 0) : users.filter(u => u.status === key).length;
+    sortBy: sort?.id === 'name' ? (sort.direction === 1 ? 'name_asc' : 'name_desc') : sort?.id === 'created' && sort.direction === 1 ? 'created_asc' : 'created_desc',
+  } as TeacherFilter & StudentFilter;
+
+  // React Query hooks for Teachers and Students
+  const teachers = useTeachers(filter, !isStudent);
+  const teacherStats = useTeacherStats(!isStudent);
+  const teacherDetail = useTeacherDetail(!isStudent ? selectedUser?.id : undefined);
+  const teacherMutations = useTeacherMutations();
+
+  const students = useStudents(filter, isStudent);
+  const studentStats = useStudentStats(isStudent);
+  const studentDetail = useStudentDetail(isStudent ? selectedUser?.id : undefined);
+  const studentMutations = useStudentMutations();
+
+  const faculties = useFaculties(true);
+
+  const currentQuery = isStudent ? students : teachers;
+  const currentStats = isStudent ? studentStats : teacherStats;
+  const currentDetail = isStudent ? studentDetail : teacherDetail;
+  const mutations = isStudent ? studentMutations : teacherMutations;
+  const getErrorMessage = isStudent ? studentError : teacherError;
+
+  const users = currentQuery.data?.items ?? [];
+  const stats = isStudent
+    ? {
+        totalUsers: studentStats.data?.totalStudents ?? 0,
+        activeUsers: studentStats.data?.activeStudents ?? 0,
+        pendingApprovals: studentStats.data?.pendingApprovals ?? 0,
+        disabledUsers: studentStats.data?.disabledStudents ?? 0,
+      }
+    : {
+        totalUsers: teacherStats.data?.totalTeachers ?? 0,
+        activeUsers: teacherStats.data?.activeTeachers ?? 0,
+        pendingApprovals: teacherStats.data?.pendingApprovals ?? 0,
+        disabledUsers: teacherStats.data?.disabledTeachers ?? 0,
+      };
+
+  const statusCount = (key: string) => isStudent
+    ? ({
+        Active: studentStats.data?.activeStudents,
+        Pending: studentStats.data?.pendingApprovals,
+        Disabled: studentStats.data?.disabledStudents,
+        Rejected: studentStats.data?.rejectedStudents,
+      }[key] ?? 0)
+    : ({
+        Active: teacherStats.data?.activeTeachers,
+        Pending: teacherStats.data?.pendingApprovals,
+        Disabled: teacherStats.data?.disabledTeachers,
+        Rejected: teacherStats.data?.rejectedTeachers,
+      }[key] ?? 0);
+
   const visibleColumns = columns.filter((column) => !hiddenColumns.includes(column.id));
-  const filteredUsers = live ? users : users.filter((user) => {
-    const text = normalize([user.fullName, user.email, user.studentId, user.teacherId].join(' '));
-    return (!query.trim() || text.includes(normalize(query.trim()))) && (!department || user.department === department) && (status === 'ALL' || user.status === status);
-  }).sort((a, b) => {
-    if (!sort) return 0;
-    const first = valueFor(a, sort.id), second = valueFor(b, sort.id);
-    return (typeof first === 'number' && typeof second === 'number' ? first - second : String(first).localeCompare(String(second), 'vi')) * sort.direction;
-  });
-  const totalCount = live ? teachers.data?.totalCount ?? 0 : filteredUsers.length;
-  const totalPages = Math.max(1, live ? teachers.data?.totalPages ?? 1 : Math.ceil(totalCount / pageSize));
-  const currentPage = live ? page : Math.min(page, totalPages);
+  const totalCount = currentQuery.data?.totalCount ?? 0;
+  const totalPages = Math.max(1, currentQuery.data?.totalPages ?? 1);
+  const currentPage = page;
   const start = (currentPage - 1) * pageSize;
-  const pageUsers = live ? users : filteredUsers.slice(start, start + pageSize);
+  const pageUsers = users;
+
   useEffect(() => {
-    // Reconcile the current page after the server reports fewer matching records.
-    // eslint-disable-next-line react/set-state-in-effect
-    if (live && teachers.data && page > totalPages) setPage(totalPages);
-  }, [live, teachers.data, page, totalPages]);
+    if (currentQuery.data && page > totalPages) setPage(totalPages);
+  }, [currentQuery.data, page, totalPages]);
+
   const pageSelected = pageUsers.filter((user) => selectedIds.includes(user.id)).length;
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = pageSelected > 0 && pageSelected < pageUsers.length;
   }, [pageSelected, pageUsers.length]);
+
   useEffect(() => {
     if (!panel) return;
     const outside = (event: PointerEvent) => { if (!(event.target as Element).closest('[data-personnel-menu]')) setPanel(null); };
@@ -122,6 +156,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     document.addEventListener('keydown', escape);
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
   }, [panel]);
+
   const togglePanel = (next: Panel, trigger: HTMLElement) => { panelTrigger.current = trigger; setPanel((current) => current === next ? null : next); };
   const changeStatus = (next: string) => {
     setStatus(next); changePage(1); setPanel(null); setSelectedIds([]);
@@ -135,53 +170,101 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     rootRef.current?.classList.add('personnel-resizing');
   };
   const endResize = () => { resizeRef.current = null; rootRef.current?.classList.remove('personnel-resizing'); };
+
   const exportCSV = async () => {
-    if (live) {
-      try { await adminTeacherApi.export(filter); } catch (error) { toast.error(teacherError(error)); }
-      return;
+    try {
+      if (isStudent) {
+        await adminStudentApi.export(filter);
+      } else {
+        await adminTeacherApi.export(filter);
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
-    const rows = selectedIds.length ? filteredUsers.filter((user) => selectedIds.includes(user.id)) : filteredUsers;
-    const escape = (value: string | number) => `"${String(value).replace(/^[=+@-]/, "'$&").replace(/"/g, '""')}"`;
-    const csv = [visibleColumns.map((column) => column.label), ...rows.map((user) => visibleColumns.map((column) => column.id === 'created' ? dateLabel(user.createdAt) : valueFor(user, column.id)))].map((row) => row.map(escape).join(',')).join('\r\n');
-    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' }));
-    const link = document.createElement('a'); link.href = url; link.download = `${role === 'Student' ? 'sinh-vien' : 'giao-vien'}.csv`; link.click(); URL.revokeObjectURL(url); setPanel(null);
+    setPanel(null);
   };
+
   const openCreate = () => { setEditingUser(null); setFormOpen(true); setPanel(null); };
+
   const updateStatus = async (user: AdminUserItem, next: AdminUserItem['status']) => {
-    if (live) {
-      if (mutations.busy) return;
-      try {
-        await mutations.action.mutateAsync({ id: user.id, action: next === 'Rejected' ? 'reject' : next === 'Disabled' ? 'disable' : user.status === 'Disabled' ? 'enable' : 'approve' });
-        setSelectedUser(null); toast.success('Đã cập nhật trạng thái');
-      } catch (error) { toast.error(teacherError(error)); }
-      return;
-    }
-    setUsers((current) => current.map((item) => item.id === user.id ? { ...item, status: next } : item));
-    setSelectedUser((current) => current?.id === user.id ? { ...current, status: next } : current);
-    toast.success('Đã cập nhật trạng thái trong bản xem thử');
-  };
-  const saveUser = async (data: TeacherFormData) => {
-    if (live) {
-      if (editingUser) await mutations.update.mutateAsync({ id: editingUser.id, data });
-      else await mutations.create.mutateAsync(data);
-      toast.success('Đã lưu hồ sơ giáo viên');
-    } else {
-      if (editingUser) setUsers(current => current.map(user => user.id === editingUser.id ? { ...user, ...data, role } : user));
-      else setUsers(current => [{ ...data, id: crypto.randomUUID(), fullName: data.fullName || '', email: data.email || '', role, status: data.status || 'Active', createdAt: new Date().toISOString() }, ...current]);
-      toast.success('Đã lưu hồ sơ trong bản xem thử');
+    if (mutations.busy) return;
+    try {
+      await mutations.action.mutateAsync({
+        id: user.id,
+        action: next === 'Rejected' ? 'reject' : next === 'Disabled' ? 'disable' : user.status === 'Disabled' ? 'enable' : 'approve'
+      });
+      setSelectedUser(null);
+      toast.success('Đã cập nhật trạng thái');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
     }
   };
+
+  const saveUser = async (data: TeacherFormData | StudentFormData) => {
+    try {
+      if (editingUser) await mutations.update.mutateAsync({ id: editingUser.id, data: data as any });
+      else await mutations.create.mutateAsync(data as any);
+      toast.success(`Đã lưu hồ sơ ${roleLabel}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
   const bulkAction = async (action: 'approve' | 'disable') => {
     try {
       await mutations.bulk.mutateAsync({ ids: selectedIds, action });
-      setSelectedIds([]); toast.success('Đã cập nhật các giáo viên đã chọn');
-    } catch (error) { toast.error(teacherError(error)); }
+      setSelectedIds([]);
+      toast.success(`Đã cập nhật các ${roleLabel} đã chọn`);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    ids: string[];
+    title: string;
+    description: string;
+  } | null>(null);
+
+  const deleteSingle = async (user: AdminUserItem) => {
+    try {
+      await mutations.remove.mutateAsync(user.id);
+      setSelectedUser(null);
+      setSelectedIds((prev) => prev.filter((id) => id !== user.id));
+      toast.success(`Đã xóa tài khoản ${user.fullName}`);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirm || mutations.busy) return;
+    try {
+      if (deleteConfirm.ids.length === 1) {
+        await mutations.remove.mutateAsync(deleteConfirm.ids[0]);
+      } else {
+        await mutations.bulkDelete.mutateAsync(deleteConfirm.ids);
+      }
+      setSelectedIds((prev) => prev.filter((id) => !deleteConfirm.ids.includes(id)));
+      if (selectedUser && deleteConfirm.ids.includes(selectedUser.id)) {
+        setSelectedUser(null);
+      }
+      toast.success(`Đã xóa thành công ${deleteConfirm.ids.length} tài khoản`);
+      setDeleteConfirm(null);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   };
 
   return (
     <div ref={rootRef} className="personnel-page">
-      {live && teachers.isPending && <p role="status">Đang tải danh sách giáo viên…</p>}
-      {live && (teachers.error || teacherStats.error || faculties.error || detail.error) && <p role="alert">{teacherError(teachers.error || teacherStats.error || faculties.error || detail.error)} <button onClick={() => { void teachers.refetch(); void teacherStats.refetch(); void faculties.refetch(); if (selectedUser) void detail.refetch(); }}>Thử lại</button></p>}
+      {currentQuery.isPending && <p role="status">Đang tải danh sách {roleLabel}…</p>}
+      {(currentQuery.error || currentStats.error || faculties.error || currentDetail.error) && (
+        <p role="alert">
+          {getErrorMessage(currentQuery.error || currentStats.error || faculties.error || currentDetail.error)}{' '}
+          <button onClick={() => { void currentQuery.refetch(); void currentStats.refetch(); void faculties.refetch(); if (selectedUser) void currentDetail.refetch(); }}>Thử lại</button>
+        </p>
+      )}
       {showNotice && (
         <div className="personnel-notice" role="status">
           <Megaphone size={16} />
@@ -206,7 +289,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
             <h1>
               {status === 'ALL'
                 ? `Tất cả ${roleLabel}`
-                : `${role === 'Student' ? 'Sinh viên' : 'Giáo viên'} · ${statusLabels[status as AdminUserItem['status']]}`}
+                : `${isStudent ? 'Sinh viên' : 'Giáo viên'} · ${statusLabels[status as AdminUserItem['status']]}`}
             </h1>
             <ChevronDown size={16} />
           </button>
@@ -281,8 +364,8 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                 <button onClick={() => { setWidths({}); setHiddenColumns([]); setPanel(null); }}>
                   Khôi phục các cột
                 </button>
-                <button onClick={() => { if (live) void teachers.refetch(); else setUsers(initialUsers.map((user) => ({ ...user }))); setSelectedIds([]); setPanel(null); }}>
-                  {live ? 'Làm mới dữ liệu' : 'Làm mới dữ liệu mẫu'}
+                <button onClick={() => { void currentQuery.refetch(); void currentStats.refetch(); setSelectedIds([]); setPanel(null); }}>
+                  Làm mới dữ liệu
                 </button>
               </div>
             )}
@@ -329,13 +412,25 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
               onChange={(event) => { setDepartment(event.target.value); changePage(1); setSelectedIds([]); }}
             >
               <option value="">Tất cả đơn vị / khoa</option>
-              {live ? faculties.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>) : DEPARTMENTS.map((item) => <option key={item}>{item}</option>)}
+              {faculties.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
             <ChevronDown size={14} />
           </div>
-          {live && selectedIds.length > 0 && <>
-            <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Pending' && u.emailVerifiedAt)} onClick={() => void bulkAction('approve')}>Duyệt đã chọn</button>
+          {selectedIds.length > 0 && <>
+            <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Pending' && (isStudent || u.emailVerifiedAt))} onClick={() => void bulkAction('approve')}>Duyệt đã chọn</button>
             <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Active')} onClick={() => void bulkAction('disable')}>Khóa đã chọn</button>
+            <button
+              className="personnel-btn-danger"
+              disabled={mutations.busy}
+              onClick={() => setDeleteConfirm({
+                ids: selectedIds,
+                title: `Xóa ${selectedIds.length} ${roleLabel} đã chọn?`,
+                description: `Hành động này sẽ xóa vĩnh viễn dữ liệu của ${selectedIds.length} tài khoản khỏi hệ thống và không thể hoàn tác.`
+              })}
+            >
+              <Trash2 size={13} />
+              Xóa đã chọn
+            </button>
           </>}
           {selectedIds.length > 0 && (
             <button className="personnel-selection-badge" onClick={() => setSelectedIds([])}>
@@ -426,13 +521,89 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
         </div>
 
         <div className={`personnel-table-scroll ${compact ? '' : 'personnel-comfortable'}`}>
-          <table style={{ width: 48 + visibleColumns.reduce((total, column) => total + (widths[column.id] ?? column.width), 0) }}>
+          <table style={{ width: 48 + 80 + visibleColumns.reduce((total, column) => total + (widths[column.id] ?? column.width), 0) }}>
             <caption className="personnel-sr-only">Danh sách {roleLabel}. Kéo mép phải tiêu đề cột hoặc dùng phím mũi tên để thay đổi độ rộng.</caption>
-            <colgroup><col style={{ width: 48 }} />{visibleColumns.map((column) => <col key={column.id} style={{ width: widths[column.id] ?? column.width }} />)}</colgroup>
-            <thead><tr><th className="personnel-checkbox-cell"><input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={pageUsers.length > 0 && pageSelected === pageUsers.length} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...pageUsers.map((user) => user.id)])] : current.filter((id) => !pageUsers.some((user) => user.id === id)))} /></th>{visibleColumns.map((column) => <th key={column.id} scope="col" aria-sort={sort?.id === column.id ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}><button className="personnel-column-title" disabled={live && column.id !== 'name' && column.id !== 'created'} onClick={() => { changePage(1); setSort((current) => ({ id: column.id, direction: current?.id === column.id && current.direction === 1 ? -1 : 1 })); }}><span>{column.label}</span>{sort?.id === column.id && <span>{sort.direction === 1 ? '↑' : '↓'}</span>}</button><span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${column.label}`} aria-orientation="vertical" aria-valuemin={column.min} aria-valuemax={600} aria-valuenow={widths[column.id] ?? column.width} tabIndex={0} onPointerDown={(event) => beginResize(event, column)} onPointerMove={(event) => { const resizing = resizeRef.current; if (resizing?.id === column.id) setWidths((current) => ({ ...current, [column.id]: Math.max(resizing.min, Math.min(600, resizing.width + event.clientX - resizing.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths((current) => ({ ...current, [column.id]: column.width }))} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setWidths((current) => ({ ...current, [column.id]: Math.max(column.min, Math.min(600, (current[column.id] ?? column.width) + (event.key === 'ArrowRight' ? 16 : -16))) })); } }} /></th>)}</tr></thead>
-            <tbody>{pageUsers.map((user, index) => <tr key={user.id} className={selectedIds.includes(user.id) ? 'is-selected' : ''} onDoubleClick={() => { setEditingUser(user); setFormOpen(true); }}><td className="personnel-checkbox-cell"><input type="checkbox" aria-label={`Chọn ${user.fullName}`} checked={selectedIds.includes(user.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} /></td>{visibleColumns.map((column) => <td key={column.id} title={String(valueFor(user, column.id))}>{column.id === 'name' ? <button className="personnel-name" onClick={() => setSelectedUser(user)}><span className="personnel-avatar" style={{ background: avatarColors[(start + index) % avatarColors.length] }}>{user.fullName.split(' ').slice(-2).map((part) => part.charAt(0)).join('')}</span><span>{user.fullName}</span></button> : column.id === 'email' ? <a className="personnel-email" href={`mailto:${user.email}`}>{user.email}</a> : column.id === 'status' ? <span className={`personnel-status status-${user.status}`}><i /><span>{statusLabels[user.status]}</span></span> : column.id === 'created' ? dateLabel(user.createdAt) : valueFor(user, column.id) || (typeof valueFor(user, column.id) === 'number' ? 0 : '–')}</td>)}</tr>)}</tbody>
+            <colgroup>
+              <col style={{ width: 48 }} />
+              {visibleColumns.map((column) => <col key={column.id} style={{ width: widths[column.id] ?? column.width }} />)}
+              <col style={{ width: 80 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="personnel-checkbox-cell">
+                  <input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={pageUsers.length > 0 && pageSelected === pageUsers.length} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...pageUsers.map((user) => user.id)])] : current.filter((id) => !pageUsers.some((user) => user.id === id)))} />
+                </th>
+                {visibleColumns.map((column) => (
+                  <th key={column.id} scope="col" aria-sort={sort?.id === column.id ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}>
+                    <button className="personnel-column-title" disabled={column.id !== 'name' && column.id !== 'created'} onClick={() => { changePage(1); setSort((current) => ({ id: column.id, direction: current?.id === column.id && current.direction === 1 ? -1 : 1 })); }}>
+                      <span>{column.label}</span>
+                      {sort?.id === column.id && <span>{sort.direction === 1 ? '↑' : '↓'}</span>}
+                    </button>
+                    <span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${column.label}`} aria-orientation="vertical" aria-valuemin={column.min} aria-valuemax={600} aria-valuenow={widths[column.id] ?? column.width} tabIndex={0} onPointerDown={(event) => beginResize(event, column)} onPointerMove={(event) => { const resizing = resizeRef.current; if (resizing?.id === column.id) setWidths((current) => ({ ...current, [column.id]: Math.max(resizing.min, Math.min(600, resizing.width + event.clientX - resizing.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths((current) => ({ ...current, [column.id]: column.width }))} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setWidths((current) => ({ ...current, [column.id]: Math.max(column.min, Math.min(600, (current[column.id] ?? column.width) + (event.key === 'ArrowRight' ? 16 : -16))) })); } }} />
+                  </th>
+                ))}
+                <th scope="col" style={{ width: 80, textAlign: 'center' }}>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageUsers.map((user, index) => (
+                <tr key={user.id} className={selectedIds.includes(user.id) ? 'is-selected' : ''} onDoubleClick={() => { setEditingUser(user); setFormOpen(true); }}>
+                  <td className="personnel-checkbox-cell">
+                    <input type="checkbox" aria-label={`Chọn ${user.fullName}`} checked={selectedIds.includes(user.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} />
+                  </td>
+                  {visibleColumns.map((column) => (
+                    <td key={column.id} title={String(valueFor(user, column.id))}>
+                      {column.id === 'name' ? (
+                        <button className="personnel-name" onClick={() => setSelectedUser(user)}>
+                          <span className="personnel-avatar" style={{ background: avatarColors[(start + index) % avatarColors.length] }}>
+                            {user.fullName.split(' ').slice(-2).map((part) => part.charAt(0)).join('')}
+                          </span>
+                          <span>{user.fullName}</span>
+                        </button>
+                      ) : column.id === 'email' ? (
+                        <a className="personnel-email" href={`mailto:${user.email}`}>{user.email}</a>
+                      ) : column.id === 'status' ? (
+                        <span className={`personnel-status status-${user.status}`}><i /><span>{statusLabels[user.status]}</span></span>
+                      ) : column.id === 'created' ? (
+                        dateLabel(user.createdAt)
+                      ) : (
+                        valueFor(user, column.id) || (typeof valueFor(user, column.id) === 'number' ? 0 : '–')
+                      )}
+                    </td>
+                  ))}
+                  <td className="personnel-actions-cell" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="personnel-row-action-btn edit"
+                      title="Chỉnh sửa hồ sơ"
+                      aria-label="Chỉnh sửa hồ sơ"
+                      onClick={() => { setEditingUser(user); setFormOpen(true); }}
+                    >
+                      <Edit3 size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="personnel-row-action-btn danger"
+                      title="Xóa tài khoản"
+                      aria-label="Xóa tài khoản"
+                      onClick={() => {
+                        setDeleteConfirm({
+                          ids: [user.id],
+                          title: `Xóa tài khoản ${user.fullName}?`,
+                          description: `Hành động này sẽ xóa vĩnh viễn tài khoản ${user.email} (${user.studentId || user.teacherId || ''}) khỏi hệ thống.`
+                        });
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
-          {!filteredUsers.length && !(live && (teachers.isPending || teachers.isError)) && <div className="personnel-empty"><Search size={28} /><strong>Không tìm thấy {roleLabel}</strong><p>Thử từ khóa khác hoặc đặt lại bộ lọc.</p><button onClick={resetFilters}>Đặt lại bộ lọc</button></div>}
+          {!users.length && !currentQuery.isPending && !currentQuery.isError && (
+            <div className="personnel-empty"><Search size={28} /><strong>Không tìm thấy {roleLabel}</strong><p>Thử từ khóa khác hoặc đặt lại bộ lọc.</p><button onClick={resetFilters}>Đặt lại bộ lọc</button></div>
+          )}
         </div>
 
         <footer className="personnel-pagination">
@@ -454,8 +625,63 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
         </footer>
       </section>
 
-      <UserDetailModal detailError={live && detail.error ? teacherError(detail.error) : undefined} busy={mutations.busy || (live && detail.isFetching)} user={live ? (selectedUser ? detail.data ?? selectedUser : null) : selectedUser} onClose={() => setSelectedUser(null)} onApproveTeacher={(user) => updateStatus(user, 'Active')} onRejectTeacher={(user) => updateStatus(user, 'Rejected')} onToggleStatus={(user) => updateStatus(user, user.status === 'Disabled' ? 'Active' : 'Disabled')} />
-      <UserFormModal fixedRole={role} faculties={live ? faculties.data ?? [] : undefined} isOpen={formOpen} initialData={editingUser} onClose={() => { setFormOpen(false); setEditingUser(null); }} onSubmit={saveUser} />
+      <UserDetailModal
+        detailError={currentDetail.error ? getErrorMessage(currentDetail.error) : undefined}
+        busy={mutations.busy || currentDetail.isFetching}
+        user={selectedUser ? currentDetail.data ?? selectedUser : null}
+        onClose={() => setSelectedUser(null)}
+        onApproveTeacher={(user) => updateStatus(user, 'Active')}
+        onRejectTeacher={(user) => updateStatus(user, 'Rejected')}
+        onToggleStatus={(user) => updateStatus(user, user.status === 'Disabled' ? 'Active' : 'Disabled')}
+        onDeleteUser={deleteSingle}
+      />
+      <UserFormModal
+        fixedRole={role}
+        faculties={faculties.data ?? []}
+        isOpen={formOpen}
+        initialData={editingUser}
+        onClose={() => { setFormOpen(false); setEditingUser(null); }}
+        onSubmit={saveUser}
+      />
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{deleteConfirm.title}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Xác nhận thao tác xóa tài khoản</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed bg-rose-50/60 border border-rose-100 p-3 rounded-xl">
+              {deleteConfirm.description}
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={mutations.busy}
+                onClick={() => setDeleteConfirm(null)}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={mutations.busy}
+                onClick={executeDelete}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium cursor-pointer transition-colors shadow-xs"
+              >
+                {mutations.busy ? 'Đang xử lý...' : 'Xác nhận xóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+

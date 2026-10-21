@@ -1,5 +1,6 @@
 using CodePath.Api.Extensions;
 using CodePath.Application.Ai;
+using CodePath.Shared.Kernel.Common;
 using Microsoft.AspNetCore.SignalR;
 using System.Text.Json;
 namespace CodePath.Api.Endpoints;
@@ -34,7 +35,7 @@ public static class AiEndpoints
                 }
                 return Results.Ok(result);
             }
-            catch (AiPolicyException ex) { return Results.Json(new { code = ex.Code }, statusCode: ex.Status); }
+            catch (AiPolicyException ex) { return Result<object>.Failure(ErrorCatalog.GetSafeMessage(ex.Code), ex.Code).ToHttpResult(); }
         });
         group.MapPost("/{id:guid}/feedback", async (Guid id, AiFeedback feedback, HttpContext http, IAiService service, CancellationToken ct) =>
             await service.Feedback(http.User.GetUserId()!.Value, id, feedback.Helpful, ct) ? Results.NoContent() : Results.NotFound());

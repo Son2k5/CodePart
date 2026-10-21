@@ -86,8 +86,8 @@ public sealed class JudgeWorker(IServiceScopeFactory scopes, JudgeQueue queue, I
             s.Results.Add(new() { SubmissionId = id, TestCaseId = t.Id, Index = t.Order, IsSample = t.IsSample,
                 Input = t.IsSample ? t.Input : null, ExpectedOutput = t.IsSample ? t.ExpectedOutput : null,
                 Verdict = verdict, ActualOutput = JudgeRules.Clip(result.Output, t.IsSample ? 16384 : 256),
-                ErrorMessage = t.IsSample ? JudgeRules.Clip(result.Error) : null, RuntimeMs = result.RuntimeMs, MemoryKb = result.MemoryKb });
-            if (verdict == Verdict.CompileError && t.IsSample) s.CompileOutput = JudgeRules.Clip(result.Error);
+                ErrorMessage = t.IsSample ? JudgeSanitizer.Sanitize(result.Error) : null, RuntimeMs = result.RuntimeMs, MemoryKb = result.MemoryKb });
+            if (verdict == Verdict.CompileError && t.IsSample) s.CompileOutput = JudgeSanitizer.Sanitize(result.Error);
             s.PassedCount = s.Results.Count(r => r.Verdict == Verdict.Accepted);
             s.MaxRuntimeMs = s.Results.Max(r => r.RuntimeMs); s.MaxMemoryKb = s.Results.Max(r => r.MemoryKb);
             await db.SaveChangesAsync(ct); await progress.CommitAsync(ct);

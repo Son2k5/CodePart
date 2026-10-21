@@ -17,6 +17,8 @@ public sealed record CreateTeacherCommand(Guid ActorId, CreateTeacherInput Data,
 public sealed record UpdateTeacherCommand(Guid ActorId, Guid Id, TeacherProfileInput Data, string? IpAddress) : IRequest<Result<Guid>>;
 public sealed record EnableUserCommand(Guid ActorId, Guid UserId, string? IpAddress) : IRequest<Result<AdminUserStatusChangeDto>>;
 public sealed record BulkTeachersCommand(Guid ActorId, Guid[] UserIds, bool Approve, string? IpAddress) : IRequest<Result<int>>;
+public sealed record DeleteTeacherCommand(Guid ActorId, Guid Id, string? IpAddress) : IRequest<Result<bool>>;
+public sealed record BulkDeleteTeachersCommand(Guid ActorId, Guid[] UserIds, string? IpAddress) : IRequest<Result<int>>;
 
 public sealed class TeacherProfileValidator : AbstractValidator<TeacherProfileInput>
 {
@@ -76,12 +78,34 @@ public sealed class BulkTeachersCommandValidator : AbstractValidator<BulkTeacher
     }
 }
 
+public sealed class DeleteTeacherCommandValidator : AbstractValidator<DeleteTeacherCommand>
+{
+    public DeleteTeacherCommandValidator()
+    {
+        RuleFor(x => x.ActorId).NotEmpty();
+        RuleFor(x => x.Id).NotEmpty();
+    }
+}
+
+public sealed class BulkDeleteTeachersCommandValidator : AbstractValidator<BulkDeleteTeachersCommand>
+{
+    public BulkDeleteTeachersCommandValidator()
+    {
+        RuleFor(x => x.ActorId).NotEmpty();
+        RuleFor(x => x.UserIds).NotEmpty().Must(x => x != null && x.Length <= 100 && x.Distinct().Count() == x.Length)
+            .WithMessage("Select 1 to 100 distinct teachers.");
+        RuleForEach(x => x.UserIds).NotEmpty();
+    }
+}
+
 internal sealed class TeacherCommandHandlers(IAdminDbContext db, IUsersDbContext users,
     IAuthDbContext auth, IPasswordHasher hasher, TimeProvider clock, AdminStatusChangeService statusService) :
     IRequestHandler<CreateTeacherCommand, Result<Guid>>,
     IRequestHandler<UpdateTeacherCommand, Result<Guid>>,
     IRequestHandler<EnableUserCommand, Result<AdminUserStatusChangeDto>>,
-    IRequestHandler<BulkTeachersCommand, Result<int>>
+    IRequestHandler<BulkTeachersCommand, Result<int>>,
+    IRequestHandler<DeleteTeacherCommand, Result<bool>>,
+    IRequestHandler<BulkDeleteTeachersCommand, Result<int>>
 {
     public async Task<Result<Guid>> Handle(CreateTeacherCommand r, CancellationToken ct)
     {
@@ -150,6 +174,21 @@ internal sealed class TeacherCommandHandlers(IAdminDbContext db, IUsersDbContext
         }
         await users.SaveChangesAsync(token);
         return Result<int>.Success(targets.Count);
+    }, ct);
+
+    public Task<Result<bool>> Handle(DeleteTeacherCommand r, CancellationToken ct) =>
+        db.ExecuteInTransactionAsync(token => db.DeleteUserAsync(r.ActorId, r.Id, r.IpAddress, token), ct);
+
+    public Task<Result<int>> Handle(BulkDeleteTeachersCommand r, CancellationToken ct) => db.ExecuteInTransactionAsync(async token =>
+    {
+        var count = 0;
+        foreach (var id in r.UserIds.Order())
+        {
+            var res = await db.DeleteUserAsync(r.ActorId, id, r.IpAddress, token);
+            if (!res.IsSuccess) return Result<int>.Failure(res.Error ?? "Xóa giáo viên thất bại.", res.ErrorCode);
+            count++;
+        }
+        return Result<int>.Success(count);
     }, ct);
 
     private async Task<Result<Guid>?> ValidateReferences(string? code, Guid? facultyId, Guid? exceptId, CancellationToken ct)

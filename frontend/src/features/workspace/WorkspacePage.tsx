@@ -10,13 +10,13 @@ import rehypeSanitize from 'rehype-sanitize';
 import { toast } from 'sonner';
 import { active, judgeApi, judgeError, problemScope, useSubmissionStatus, type Problem, type TestResult } from '../code-judge/api';
 import { useAuthStore } from '../auth/store/authStore';
-import { AiAssistantPanel } from '../ai-assistant/AiAssistantPanel';
 import { axiosInstance } from '../../lib/axios';
 import { createWorkspaceStore, draftKey, type WorkspaceStore } from './store';
 import { Empty, Loading, Mascot, Modal, PanelBoundary } from './ui';
 import { ResultCard, TestGrid, VerdictBanner, verdictLabel } from './Results';
 import type { Diagnostic, EditorHandle } from './CodeEditor';
 import './workspace.css';
+const AiAssistantPanel = lazy(() => import('../ai-assistant/AiAssistantPanel').then(m => ({ default: m.AiAssistantPanel })));
 const CodeEditor = lazy(() => import('./CodeEditor'));
 const MockControls = lazy(() => import('./mocks/MockControls'));
 const noLines: number[] = [];
@@ -38,7 +38,7 @@ function SaveStatus({ store, draftId }: { store: WorkspaceStore; draftId: string
 }
 function Assistant({ store, draftId, problem, language, snapshot, results, onLines }: { store: WorkspaceStore; draftId: string; problem: Problem; language: string; snapshot?: Snapshot; results?: TestResult[]; onLines: (lines: number[]) => void }) {
   const code = useStore(store, s => s.drafts[draftId]?.code ?? '');
-  return <><div className="ws-assistant-intro"><Mascot /><div><span className="ws-eyebrow">BẠN ĐỒNG HÀNH NHỎ</span><h2>Gỡ rối cùng Mầm</h2><p>Một gợi ý nhỏ, một bước tiến mới.</p></div></div><AiAssistantPanel key={draftId} problemId={problem.id} language={language} sourceCode={code} starterCode={problem.starterCodes.find(s => s.language === language)?.template ?? ''} results={snapshot?.code === code && snapshot.language === language ? results : undefined} onLines={onLines} /></>;
+  return <><div className="ws-assistant-intro"><Mascot /><div><span className="ws-eyebrow">BẠN ĐỒNG HÀNH NHỎ</span><h2>Gỡ rối cùng Mầm</h2><p>Một gợi ý nhỏ, một bước tiến mới.</p></div></div><Suspense fallback={<Loading text="Đang chuẩn bị trợ giảng AI…" />}><AiAssistantPanel key={draftId} problemId={problem.id} language={language} sourceCode={code} starterCode={problem.starterCodes.find(s => s.language === language)?.template ?? ''} results={snapshot?.code === code && snapshot.language === language ? results : undefined} onLines={onLines} /></Suspense></>;
 }
 
 function Workspace({ problem: p }: { problem: Problem }) {
@@ -146,7 +146,7 @@ function Workspace({ problem: p }: { problem: Problem }) {
       <Panel id="problem" defaultSize="42%" minSize="28%" className={`ws-card ws-problem ${mobileTab === 'description' ? 'ws-mobile-active' : ''}`}>
         <Tabs.Root value={leftTab} onValueChange={setLeftTab} className="ws-tab-root"><Tabs.List className="ws-tabs" aria-label="Nội dung bài tập"><Tabs.Trigger value="description"><BookOpen size={15} />Đề bài</Tabs.Trigger><Tabs.Trigger value="assistant"><Sparkles size={15} />Trợ giảng AI</Tabs.Trigger><Tabs.Trigger value="history"><History size={15} />Bài đã nộp</Tabs.Trigger></Tabs.List>
           <Tabs.Content value="description" className="ws-panel-scroll"><div className="ws-problem-heading"><span className="ws-eyebrow">THỬ THÁCH HÔM NAY</span><div className="ws-problem-pager"><button aria-label="Bài trước" disabled={busy || position <= 0} onClick={() => navigate(problemPath(siblings[position - 1]))}><ChevronLeft size={16} /></button><button aria-label="Bài tiếp theo" disabled={busy || position < 0 || position >= siblings.length - 1} onClick={() => navigate(problemPath(siblings[position + 1]))}><ChevronRight size={16} /></button></div></div><h2>{p.title}</h2><div className="ws-problem-meta"><span className="ws-badge is-pass">{({ Easy: 'Dễ', Medium: 'Vừa sức', Hard: 'Thử thách' } as Record<string, string>)[p.difficulty] ?? p.difficulty}</span><span>◷ {p.timeLimitMs} ms</span><span>▤ {p.memoryLimitMb} MB</span></div><div className="ws-markdown"><Markdown skipHtml rehypePlugins={[rehypeSanitize]}>{p.description}</Markdown></div>{samples.map((test, index) => <section className="ws-example" key={test.id ?? index}><h3><span>{index + 1}</span>Ví dụ {index + 1}</h3><div><label>Đầu vào</label><pre>{test.input}</pre><label>Đầu ra</label><pre>{test.expectedOutput}</pre></div></section>)}<div className="ws-note"><Sparkles size={18} /><p>Bí ý tưởng? Ghé tab <strong>Trợ giảng AI</strong> để nhận một gợi ý nhỏ nhé.</p></div></Tabs.Content>
-          <Tabs.Content value="assistant" className="ws-panel-scroll"><PanelBoundary><Assistant store={store} draftId={draftId} problem={p} language={language} snapshot={snapshot} results={runResults ?? s?.results} onLines={highlightLines} /></PanelBoundary></Tabs.Content>
+          <Tabs.Content value="assistant" className="ws-panel-scroll"><PanelBoundary>{leftTab === 'assistant' && <Assistant store={store} draftId={draftId} problem={p} language={language} snapshot={snapshot} results={runResults ?? s?.results} onLines={highlightLines} />}</PanelBoundary></Tabs.Content>
           <Tabs.Content value="history" className="ws-panel-scroll"><h2>Những lần bạn đã cố gắng</h2><p className="ws-muted">Mỗi lần thử đều giúp bạn tiến bộ hơn.</p>{history.isPending ? <Loading text="Đang tải bài đã nộp…" /> : history.isError ? <button onClick={() => void history.refetch()}>Tải lại lịch sử</button> : !history.data.items.length ? <Empty title="Hành trình bắt đầu từ đây">Bài nộp đầu tiên của bạn sẽ xuất hiện ở đây.</Empty> : history.data.items.map(item => <button className="ws-history" disabled={busy} key={item.id} onClick={() => { setSnapshot(undefined); setRunResults(undefined); setSubmissionId(item.id); revealResults(); }}><span><strong>{verdictLabel[item.status] ?? item.status}</strong><small>{item.language} · {new Date(item.createdAt).toLocaleString('vi-VN')}</small></span><span>{item.passedCount}/{item.totalCount}<ChevronRight size={15} /></span></button>)}<div className="ws-pagination"><button disabled={historyPage === 1} onClick={() => setHistoryPage(v => v - 1)}>Trước</button><span>Trang {historyPage}</span><button disabled={historyPage * 20 >= (history.data?.total ?? 0)} onClick={() => setHistoryPage(v => v + 1)}>Sau</button></div></Tabs.Content>
         </Tabs.Root>
       </Panel>

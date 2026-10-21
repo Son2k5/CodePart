@@ -56,8 +56,8 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
                     ? SessionActivityService.IdleCode : SessionActivityService.ExpiredCode);
             await RevokeFamilyAsync(existingToken, request.IpAddress, cancellationToken);
             return Result<LoginResponse>.Failure(
-                "Refresh token reuse detected. The token family has been revoked.",
-                ErrorCodes.Unauthorized);
+                "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.",
+                ErrorCodes.AuthSessionExpired);
         }
 
         var sessionError = SessionActivityService.Check(existingToken, utcNow, _authSessionPolicy.IdleTimeout);
@@ -72,7 +72,7 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
         if (user is null || user.Status != UserStatus.Active)
         {
             await RevokeFamilyAsync(existingToken, request.IpAddress, cancellationToken);
-            return Result<LoginResponse>.Failure("The user is invalid or is not active.", ErrorCodes.Forbidden);
+            return Result<LoginResponse>.Failure("Phiên đăng nhập không hợp lệ hoặc đã hết hạn.", ErrorCodes.Forbidden);
         }
 
         var newTokens = _jwtTokenService.GenerateTokens(
@@ -96,8 +96,8 @@ internal sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenC
         {
             await RevokeFamilyAsync(existingToken, request.IpAddress, cancellationToken);
             return Result<LoginResponse>.Failure(
-                "Refresh token is invalid or has already been used. The token family has been revoked.",
-                ErrorCodes.Unauthorized);
+                "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.",
+                ErrorCodes.AuthSessionExpired);
         }
 
         return Result<LoginResponse>.Success(new LoginResponse(

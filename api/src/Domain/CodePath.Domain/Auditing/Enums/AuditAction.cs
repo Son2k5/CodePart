@@ -8,5 +8,11 @@ public enum AuditAction
     UserEnabled,
     TeacherCreated,
     TeacherUpdated,
-    ClassChanged
+    ClassChanged,
+    StudentCreated,
+    StudentUpdated,
+    StudentApproved,
+    StudentRejected,
+    UserDeleted,
+    StudentDeleted
 }

@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { axiosInstance } from '../../../lib/axios';
+import { getErrorMessage } from '../../../lib/errorService';
 import { useAuthStore } from '../../auth/store/authStore';
 
 export interface Course { id: string; subjectName: string; sectionCode: string; language: string; semester: string; joinCode: string | null; capacity: number; enrolledCount: number; status: 'Draft' | 'Active' | 'Closed'; exerciseCount: number }
@@ -27,14 +27,5 @@ export function usePortalMutation() {
     ]); } });
 }
 export function portalError(error: unknown) {
-  if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    const data = error.response?.data;
-    if (data?.errors) return Object.values(data.errors).flat().join(' ');
-    if (status && status >= 500) {
-      return data?.title || 'Đã có lỗi xảy ra từ máy chủ. Vui lòng thử lại sau.';
-    }
-    return data?.detail || data?.title || 'Không thể kết nối máy chủ.';
-  }
-  return error instanceof Error ? error.message : 'Thao tác thất bại.';
+  return getErrorMessage(error, 'Thao tác thất bại. Vui lòng thử lại sau.');
 }

@@ -1,4 +1,4 @@
-.personnel-page {
+﻿.personnel-page {
   --personnel-bg: #ededf0;
   --personnel-surface: #ffffff;
   --personnel-text: #172031;
@@ -31,6 +31,62 @@
   --personnel-hover: #253349;
   --personnel-blue: #79a7ff;
   --personnel-header: #252e3e;
+}
+
+.admin-shell[data-theme='dark'] .personnel-table-scroll {
+  scrollbar-color: #475569 var(--personnel-surface);
+}
+
+.admin-shell[data-theme='dark'] .personnel-table-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+/* Non-sortable headings are labels, so keep their contrast at full strength. */
+.personnel-page .personnel-column-title:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.admin-shell[data-theme='dark'] .personnel-stat-icon.blue,
+.admin-shell[data-theme='dark'] .personnel-selection {
+  color: #93c5fd;
+  background: #1e3a5f;
+  border-color: #315580;
+}
+
+.admin-shell[data-theme='dark'] .personnel-stat-icon.green,
+.admin-shell[data-theme='dark'] .personnel-status.status-Active {
+  color: #86efac;
+  background: #143b2b;
+  border-color: #276749;
+}
+
+.admin-shell[data-theme='dark'] .personnel-stat-icon.amber,
+.admin-shell[data-theme='dark'] .personnel-status.status-Pending {
+  color: #fcd34d;
+  background: #42331b;
+  border-color: #715528;
+}
+
+.admin-shell[data-theme='dark'] .personnel-status.status-Pending i {
+  box-shadow: 0 0 0 2px #715528;
+}
+
+.admin-shell[data-theme='dark'] .personnel-stat-icon.gray,
+.admin-shell[data-theme='dark'] .personnel-status.status-Disabled {
+  color: #cbd5e1;
+  background: #293548;
+  border-color: #475569;
+}
+
+.admin-shell[data-theme='dark'] .personnel-status.status-Rejected {
+  color: #fca5a5;
+  background: #45252c;
+  border-color: #7f3943;
+}
+
+.admin-shell[data-theme='dark'] .personnel-notice-close:hover {
+  background: #1e3a5f;
 }
 
 .personnel-page button,
@@ -1081,4 +1137,79 @@
   .personnel-status.status-Pending i {
     animation: none;
   }
+}
+
+/* Danger Button in Toolbar */
+.personnel-toolbar .personnel-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.personnel-toolbar .personnel-btn-danger:hover {
+  background: #fecaca;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.admin-shell[data-theme='dark'] .personnel-toolbar .personnel-btn-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.admin-shell[data-theme='dark'] .personnel-toolbar .personnel-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+/* Action column in table */
+.personnel-actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.personnel-row-action-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--personnel-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.personnel-row-action-btn:hover {
+  background: var(--personnel-hover);
+  color: var(--personnel-text);
+  border-color: var(--personnel-line);
+}
+
+.personnel-row-action-btn.edit:hover {
+  color: var(--personnel-blue);
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.2);
+}
+
+.personnel-row-action-btn.danger:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
 }

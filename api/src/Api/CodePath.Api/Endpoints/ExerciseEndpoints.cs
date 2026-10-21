@@ -2,6 +2,7 @@ using CodePath.Api.Contracts;
 using CodePath.Api.Extensions;
 using CodePath.Application.Exercises.Commands;
 using CodePath.Application.Exercises.Queries;
+using CodePath.Shared.Kernel.Common;
 using MediatR;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -54,7 +55,7 @@ public static class ExerciseEndpoints
         {
             var studentId = httpContext.User.GetUserId();
             if (studentId is null)
-                return Results.Unauthorized();
+                return Result<object>.Failure("Bạn cần đăng nhập để thực hiện thao tác này.", ErrorCodes.Unauthorized).ToHttpResult();
 
             var result = await sender.Send(new SubmitCodeCommand(
                 studentId.Value, exerciseId, request.Language, request.SourceCode), cancellationToken);

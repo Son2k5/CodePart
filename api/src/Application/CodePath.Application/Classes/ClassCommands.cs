@@ -21,6 +21,7 @@ public sealed class ClassInputValidator : AbstractValidator<ClassInput>
         RuleFor(x => x.Name).NotEmpty().Must(x => x != null && x.Trim().Length is >= 3 and <= 100);
         RuleFor(x => x.Description).NotNull().MaximumLength(5000);
         RuleFor(x => x.Thumbnail).MaximumLength(2048).Must(x => string.IsNullOrEmpty(x) ||
+            System.Text.RegularExpressions.Regex.IsMatch(x, @"\A/api/class-images/[a-f0-9]{32}\.(png|jpg|webp)\z") ||
             Uri.TryCreate(x, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http");
         RuleFor(x => x.Status).IsInEnum(); RuleFor(x => x.AccessType).IsInEnum();
         RuleFor(x => x.MaxStudents).GreaterThan(0).When(x => x.MaxStudents.HasValue);

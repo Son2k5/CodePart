@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
 import Markdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { axiosInstance as api } from '../../lib/axios';
+import { getErrorMessage } from '../../lib/errorService';
 import { useAuthStore } from '../auth/store/authStore';
 import { RagSources, type RagReference } from '../ai-assistant/RagSources';
 import './learning.css';
-import { TeachingDraftPanel } from './TeachingDraftPanel';
+
+const TeachingDraftPanel = lazy(() => import('./TeachingDraftPanel').then(m => ({ default: m.TeachingDraftPanel })));
 
 type Block = { blockId: string; type: string; data: { markdown?: string; title?: string; assetId?: string; pageCount?: number; url?: string } };
 type Topic = { id: string; chapterId: string; title: string; slug: string; rowVersion: string; publishedVersion: number;
@@ -19,11 +20,7 @@ type IndexStatus = { enabled: boolean; status: string; chunks: number; errorCode
 const statusNames: Record<string, string> = { Pending: 'Đang chờ xử lý', Processing: 'Đang xử lý', Ready: 'Sẵn sàng',
   Failed: 'Xử lý chưa thành công', NotIndexed: 'Chưa xử lý', Superseded: 'Phiên bản đã thay đổi' };
 function message(e: unknown) {
-  const code = axios.isAxiosError(e) ? e.response?.data?.code : undefined;
-  return ({ RAG_DISABLED: 'Trợ giảng học liệu chưa được bật trên máy chủ.', RAG_UNAVAILABLE: 'Chưa thể tìm kiếm học liệu. Vui lòng thử lại.',
-    AI_UNAVAILABLE: 'Trợ giảng tạm thời chưa sẵn sàng.', RATE_LIMIT: 'Bạn đã dùng hết lượt trong khoảng thời gian này. Hãy thử lại sau.',
-    CONTEXT_CHANGED: 'Học liệu vừa thay đổi. Hãy gửi lại câu hỏi.', TOPIC_LOCKED: 'Bài học chưa được mở khóa.',
-    CONFLICT: 'Bài học đã thay đổi. Hãy tải lại trước khi lưu.' } as Record<string, string>)[code] ?? 'Không thực hiện được. Kiểm tra quyền truy cập và thử lại.';
+  return getErrorMessage(e, 'Không thực hiện được. Kiểm tra quyền truy cập và thử lại.');
 }
 
 export function LearningPage() {
@@ -120,7 +117,11 @@ function TopicEditor({ topic, refresh }: { topic: Topic; refresh: () => Promise<
       <button disabled={busy || !status.data?.enabled || ['Pending', 'Processing'].includes(status.data?.status ?? '') || !topic.publishedVersion} onClick={() => void reindex()}>Xử lý lại học liệu</button>
     </>}</section>
     {topic.status === 'Published' && <TopicAssistant topicId={topic.id} />}
-    {topic.status === 'Published' && <TeachingDraftPanel topicId={topic.id} />}
+    {topic.status === 'Published' && (
+      <Suspense fallback={<p>Đang tải trợ giảng biên soạn…</p>}>
+        <TeachingDraftPanel topicId={topic.id} />
+      </Suspense>
+    )}
   </section>;
 }
 

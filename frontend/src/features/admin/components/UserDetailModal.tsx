@@ -13,6 +13,8 @@ import {
   GraduationCap,
   BookOpen,
   Award,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import type { AdminUserItem } from '../types/admin.types';
 import { UserRoleBadge } from './UserRoleBadge';
@@ -26,6 +28,7 @@ interface UserDetailModalProps {
   onApproveTeacher: (user: AdminUserItem) => void;
   onRejectTeacher: (user: AdminUserItem) => void;
   onToggleStatus: (user: AdminUserItem) => void;
+  onDeleteUser?: (user: AdminUserItem) => void;
 }
 
 export const UserDetailModal: React.FC<UserDetailModalProps> = ({
@@ -36,7 +39,14 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   onApproveTeacher,
   onRejectTeacher,
   onToggleStatus,
+  onDeleteUser,
 }) => {
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  React.useEffect(() => {
+    setConfirmDelete(false);
+  }, [user?.id]);
+
   if (!user) return null;
 
   const getInitials = (name: string) => {
@@ -90,25 +100,26 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
         <div className="p-6 overflow-y-auto space-y-6">
           {busy && <p role="status" className="text-xs">Đang xử lý…</p>}
           {detailError && <p role="alert" className="text-xs text-rose-700">{detailError}</p>}
-          {/* Status Alert for Pending Teacher */}
-          {user.role === 'Teacher' && user.status === 'Pending' && (
+          {/* Status Alert for Pending User */}
+          {user.status === 'Pending' && (
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
               <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="text-xs space-y-1">
                 <div className="font-semibold text-amber-950">
-                  Hồ sơ giáo viên đang chờ xét duyệt
+                  Hồ sơ {user.role === 'Teacher' ? 'giáo viên' : 'sinh viên'} đang chờ xét duyệt
                 </div>
                 <p className="text-amber-800">
-                  {user.emailVerifiedAt ? 'Email nhà trường đã được xác thực.' : 'Giáo viên chưa xác thực email; chưa thể phê duyệt.'}
-                  Vui lòng kiểm tra thông tin và nhấn duyệt để cấp quyền giảng dạy.
+                  {user.role === 'Teacher'
+                    ? (user.emailVerifiedAt ? 'Email nhà trường đã được xác thực. ' : 'Giáo viên chưa xác thực email; chưa thể phê duyệt. ')
+                    : ''}
+                  Vui lòng kiểm tra thông tin và nhấn duyệt để kích hoạt tài khoản.
                 </p>
                 <div className="pt-2 flex items-center gap-2">
                   <button
                     type="button"
-                    disabled={busy || !user.emailVerifiedAt}
+                    disabled={busy || (user.role === 'Teacher' && !user.emailVerifiedAt)}
                     onClick={() => {
                       onApproveTeacher(user);
-
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-xs cursor-pointer transition-colors"
                   >
@@ -120,7 +131,6 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                     disabled={busy}
                     onClick={() => {
                       onRejectTeacher(user);
-
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium shadow-xs cursor-pointer transition-colors"
                   >
@@ -240,6 +250,18 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             <h4 className="font-semibold">Học phần giảng dạy</h4>
             {user.teachingCourses.length ? user.teachingCourses.map(c => <p key={c.id}>{c.subjectName} ({c.sectionCode}) · {c.semester} · {c.enrolledCount}/{c.capacity} sinh viên</p>) : <p>Chưa được phân công.</p>}
           </section>}
+          {user.enrolledClasses && (
+            <section className="text-xs space-y-2">
+              <h4 className="font-semibold">Lớp niên khóa tham gia</h4>
+              {user.enrolledClasses.length ? user.enrolledClasses.map(c => <p key={c.id}>{c.name} · {c.academicYear}</p>) : <p>Chưa tham gia lớp nào.</p>}
+            </section>
+          )}
+          {user.enrolledCourses && (
+            <section className="text-xs space-y-2">
+              <h4 className="font-semibold">Học phần đã đăng ký</h4>
+              {user.enrolledCourses.length ? user.enrolledCourses.map(c => <p key={c.id}>{c.subjectName} ({c.sectionCode}) · {c.semester}{c.teacherName ? ` · GV: ${c.teacherName}` : ''}</p>) : <p>Chưa đăng ký học phần nào.</p>}
+            </section>
+          )}
           {/* Bio / Notes */}
           {user.bio && (
             <div>
@@ -256,32 +278,73 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
         {/* Footer Actions */}
         <div className="p-4 px-6 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 shrink-0">
           <div>
-            {user.role !== 'Admin' && (user.status === 'Active' || user.status === 'Disabled') && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  onToggleStatus(user);
-
-                }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  user.status === 'Disabled'
-                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-2xs'
-                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-2xs'
-                }`}
-              >
-                {user.status === 'Disabled' ? (
-                  <>
-                    <Unlock className="w-3.5 h-3.5" />
-                    Mở khóa tài khoản
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-3.5 h-3.5" />
-                    Khóa tài khoản
-                  </>
+            {confirmDelete ? (
+              <div className="flex items-center gap-2 flex-wrap bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl">
+                <span className="text-xs text-rose-800 font-medium flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  Xác nhận xóa tài khoản này?
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    onDeleteUser?.(user);
+                    setConfirmDelete(false);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium cursor-pointer shadow-xs transition-colors"
+                >
+                  {busy ? 'Đang xóa...' : 'Xác nhận xóa'}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  Hủy
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {user.role !== 'Admin' && (user.status === 'Active' || user.status === 'Disabled') && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      onToggleStatus(user);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      user.status === 'Disabled'
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-2xs'
+                        : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 shadow-2xs'
+                    }`}
+                  >
+                    {user.status === 'Disabled' ? (
+                      <>
+                        <Unlock className="w-3.5 h-3.5" />
+                        Mở khóa tài khoản
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5" />
+                        Khóa tài khoản
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+
+                {user.role !== 'Admin' && onDeleteUser && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setConfirmDelete(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    Xóa tài khoản
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

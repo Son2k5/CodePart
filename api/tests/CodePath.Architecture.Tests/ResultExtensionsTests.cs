@@ -78,4 +78,41 @@ public class ResultExtensionsTests
         problem.StatusCode.Should().Be(StatusCodes.Status409Conflict);
         problem.ProblemDetails.Extensions["code"].Should().Be(ErrorCodes.Conflict);
     }
+
+    [Fact]
+    public void ToHttpResult_ShouldAlwaysIncludeTraceId()
+    {
+        // Arrange
+        var result = Result<string>.Failure("Thao tác thất bại", ErrorCodes.BadRequest);
+
+        // Act
+        var httpResult = result.ToHttpResult();
+
+        // Assert
+        httpResult.Should().BeOfType<ProblemHttpResult>();
+        var problem = (ProblemHttpResult)httpResult;
+        problem.ProblemDetails.Extensions.Should().ContainKey("traceId");
+        problem.ProblemDetails.Extensions["traceId"].Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ToHttpResult_WhenRawMessageContainsSqlOrInternalDetails_ShouldSanitizeOutput()
+    {
+        // Arrange - simulating an internal error message with SQL / file path details leaking into Result
+        var leakyError = "Npgsql.PostgresException: 23505: duplicate key value violates unique constraint 'users_email_key' at /app/data.cs:42";
+        var result = Result<string>.Failure(leakyError, ErrorCodes.InternalServerError);
+
+        // Act
+        var httpResult = result.ToHttpResult();
+
+        // Assert
+        httpResult.Should().BeOfType<ProblemHttpResult>();
+        var problem = (ProblemHttpResult)httpResult;
+        var detail = problem.ProblemDetails.Detail;
+
+        detail.Should().NotContain("Npgsql");
+        detail.Should().NotContain("23505");
+        detail.Should().NotContain("unique constraint");
+        detail.Should().NotContain("/app/");
+    }
 }

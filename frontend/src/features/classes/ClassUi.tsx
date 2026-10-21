@@ -25,13 +25,14 @@ export function ConfirmDialog({ title, message, pending, onClose, onConfirm }: {
 export function TeacherPicker({ value, onChange }: { value: Teacher[]; onChange: (teachers: Teacher[]) => void }) {
   const [search, setSearch] = useState(''); const [page, setPage] = useState(1); const debounced = useDebounced(search);
   const query = useQuery({ queryKey: ['admin-teachers', 'class-picker', debounced, page], queryFn: ({ signal }) => adminTeacherApi.list({ search: debounced, page, pageSize: 10 }, signal) });
-  return <fieldset><legend>Giáo viên (không bắt buộc)</legend>
+  return <fieldset className="class-teacher-picker"><legend>Phân công giáo viên</legend>
+    <p>Chọn giáo viên phụ trách lớp. Có thể phân công nhiều giáo viên hoặc bổ sung sau.</p><strong>Đã chọn {value.length} giáo viên</strong>
     <div className="class-toolbar">{value.map(t => <button type="button" key={t.id} onClick={() => onChange(value.filter(x => x.id !== t.id))}>{t.fullName} ×</button>)}</div>
     <input aria-label="Tìm giáo viên" placeholder="Tìm tên hoặc email giáo viên" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
     <QueryState loading={query.isLoading} error={query.error} empty={query.data?.items.length === 0} retry={() => query.refetch()} />
-    <div className="teacher-options">{query.data?.items.map(t => <label key={t.id}>
-      <input type="checkbox" checked={value.some(x => x.id === t.id)} onChange={e => onChange(e.target.checked ? [...value, { id: t.id, fullName: t.fullName, email: t.email }] : value.filter(x => x.id !== t.id))} /> {t.fullName} — {t.email}
-    </label>)}</div>
+    <div className="teacher-picker-table"><table><thead><tr><th scope="col">Chọn</th><th scope="col">Giáo viên</th><th scope="col">Email trường</th><th scope="col">Phân công</th></tr></thead><tbody>{query.data?.items.map(t => <tr key={t.id} className={value.some(x => x.id === t.id) ? 'is-selected' : ''}>
+      <td><input type="checkbox" aria-label={`Chọn ${t.fullName}`} checked={value.some(x => x.id === t.id)} onChange={e => onChange(e.target.checked ? [...value, { id: t.id, fullName: t.fullName, email: t.email }] : value.filter(x => x.id !== t.id))} /></td><td><strong>{t.fullName}</strong></td><td>{t.email}</td><td>{value.some(x => x.id === t.id) ? 'Đã chọn' : 'Chưa chọn'}</td>
+    </tr>)}</tbody></table></div>
     <div className="class-toolbar"><button type="button" disabled={page === 1} onClick={() => setPage(page - 1)}>Trước</button><span>Trang {page}</span><button type="button" disabled={!query.data || page >= query.data.totalPages} onClick={() => setPage(page + 1)}>Sau</button></div>
   </fieldset>;
 }

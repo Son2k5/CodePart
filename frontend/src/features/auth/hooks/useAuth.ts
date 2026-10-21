@@ -6,9 +6,7 @@ import { AUTH_MESSAGES } from '../../../constants/messages';
 import { toast } from 'sonner';
 import { recordActivity, markSessionEnded } from '../sessionActivity';
 
-const getErrorMessage = (error: any) => {
-  return error.response?.data?.detail || error.response?.data?.message || error.message || 'Đã có lỗi xảy ra';
-};
+import { getErrorMessage } from '../../../lib/errorService';
 
 export const useLogin = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -26,7 +24,7 @@ export const useLogin = () => {
       } else if (data.user.role === 'Teacher') {
         navigate('/teacher');
       } else {
-        navigate('/courses');
+        navigate('/home');
       }
     },
     onError: (error: any, variables) => {
@@ -108,7 +106,7 @@ export const useForgotPassword = () => {
     onSuccess: () => {
       // Backend sends reset link via email (/reset-password#token=...).
       // Do not navigate to /reset-password directly (token comes from email).
-      toast.success(AUTH_MESSAGES.OTP_SENT);
+      toast.success('Nếu email đã đăng ký, hướng dẫn đặt lại mật khẩu sẽ được gửi đến hộp thư của bạn.');
     },
     onError: (error: any) => {
       toast.error(getErrorMessage(error));

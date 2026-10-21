@@ -1,0 +1,111 @@
+﻿/* Class management uses the shared personnel palette in both themes. */
+.class-management .personnel-grid { border-radius: 12px; }
+.class-management .personnel-toolbar { flex-wrap: wrap; gap: 10px; padding: 14px 16px; }
+.class-management .personnel-toolbar > .personnel-select { width: 195px; }
+.class-management .personnel-toolbar-actions { flex-wrap: wrap; }
+.class-management .class-tool-button { width: auto; padding: 0 10px; gap: 7px; font-size: 12px; white-space: nowrap; }
+.class-management .personnel-table-scroll table { min-width: 100%; }
+.class-management .personnel-table-scroll th { height: 44px; }
+.class-management .personnel-table-scroll td { height: 44px; }
+.class-management .personnel-comfortable td { height: 58px; }
+.class-management .personnel-table-scroll tbody tr:nth-child(even) { background: color-mix(in srgb, var(--personnel-header) 24%, var(--personnel-surface)); }
+.class-management .personnel-table-scroll tbody tr:hover,
+.class-management .personnel-table-scroll tbody tr.is-selected { background: var(--personnel-hover); }
+.class-management .class-actions-heading { text-align: center; }
+.class-management .class-actions-cell { position: sticky; right: 0; z-index: 1; background: transparent; border-left: 0; box-shadow: none; }
+.class-management .class-row-actions .personnel-row-action-btn { background: var(--personnel-surface); box-shadow: 0 2px 6px #02061714; }
+.class-management .class-row-actions { display: flex; gap: 5px; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+.class-management tr:hover .class-row-actions,
+.class-management tr:focus-within .class-row-actions { opacity: 1; pointer-events: auto; }
+.class-management .personnel-row-action-btn { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; padding: 0; height: 30px; font-size: 12px; border-color: var(--personnel-line); color: var(--personnel-text); text-decoration: none; }
+.class-management .personnel-table-scroll .class-number-cell { text-align: center; color: var(--personnel-muted); font-variant-numeric: tabular-nums; }
+.class-management .personnel-table-scroll .class-actions-cell { padding: 0 8px; }
+@media (hover: none) { .class-management .class-row-actions { opacity: 1; pointer-events: auto; } }
+@media (prefers-reduced-motion: reduce) { .class-management .class-row-actions { transition: none; } }
+.class-management .personnel-row-action-btn.edit { color: var(--personnel-blue); }
+.class-management .personnel-row-action-btn.danger { color: #dc2626; }
+.admin-shell[data-theme='dark'] .class-management .personnel-row-action-btn.danger { color: #fca5a5; }
+.class-management .personnel-selection-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid var(--personnel-line); border-radius: 6px; color: var(--personnel-blue); background: var(--personnel-hover); }
+
+.class-form-modal {
+  --form-surface: #fff;
+  --form-subtle: #f8fafc;
+  --form-text: #172031;
+  --form-muted: #64748b;
+  --form-line: #dbe2ea;
+  width: min(860px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--form-line);
+  border-radius: 18px;
+  background: var(--form-surface);
+  color: var(--form-text);
+  box-shadow: 0 24px 80px #02061740;
+  overflow: auto;
+}
+.admin-shell[data-theme='dark'] .class-form-modal {
+  --form-surface: #1c2533;
+  --form-subtle: #151e2b;
+  --form-text: #e2e8f0;
+  --form-muted: #a1afc3;
+  --form-line: #354156;
+}
+.class-form-modal::backdrop { background: #020617a6; backdrop-filter: blur(4px); }
+.class-form-modal .class-modal-heading { display: flex; align-items: center; gap: 14px; padding: 22px 26px; border-bottom: 1px solid var(--form-line); background: var(--form-subtle); }
+.class-form-modal .class-modal-heading h1 { margin: 0; font-size: 21px; line-height: 1.4; }
+.class-form-modal .class-modal-heading p { margin: 5px 0 0; color: var(--form-muted); font-size: 13px; }
+.class-form-modal .class-modal-heading > button { margin-left: auto; padding: 7px; flex-shrink: 0; }
+.class-modal-symbol { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: #60a5fa; background: #2563eb1a; flex-shrink: 0; }
+.class-editor > fieldset { border: 0; padding: 24px; margin: 0; min-width: 0; }
+.class-editor .class-form-section h2 { margin: 0; font-size: 16px; }
+.class-editor .class-form-section p { margin: 4px 0 20px; font-size: 13px; color: var(--form-muted, #64748b); }
+.class-editor .class-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.class-editor label { font-size: 13px; font-weight: 500; gap: 7px; }
+.class-editor input, .class-editor select, .class-editor textarea { width: 100%; min-height: 40px; font: inherit; }
+.class-editor .class-description { margin-top: 20px; }
+.class-editor textarea { resize: vertical; }
+.class-form-modal input:not([type=checkbox]), .class-form-modal select, .class-form-modal textarea { background: var(--form-subtle); color: var(--form-text); border: 1px solid var(--form-line); border-radius: 8px; padding: 10px 12px; }
+.class-form-modal input::placeholder, .class-form-modal textarea::placeholder { color: var(--form-muted); font-weight: 400; }
+.class-form-modal fieldset fieldset { border-color: var(--form-line); border-radius: 10px; margin-top: 24px; }
+.class-form-modal legend { padding: 0 7px; font-size: 14px; font-weight: 600; }
+.class-form-modal button { background: var(--form-surface); color: var(--form-text); border-color: var(--form-line); font-size: 13px; }
+.class-form-modal button:hover { background: var(--form-subtle); }
+.class-form-modal button.primary { color: #fff; background: #2563eb; border-color: #2563eb; }
+.class-form-modal button.primary:hover { background: #1d4ed8; }
+.class-form-modal .teacher-options label { align-items: center; gap: 10px; border-bottom: 1px solid var(--form-line); padding: 11px 4px; }
+.class-form-modal .teacher-options input[type=checkbox] { width: 16px; min-height: 16px; flex-shrink: 0; accent-color: #2563eb; }
+.class-form-modal .class-error { color: #ef4444; }
+.admin-shell[data-theme='dark'] .class-form-modal .class-error { color: #fca5a5; }
+.class-form-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--form-line, #dbe2ea); }
+.class-form-footer > span { margin-right: auto; color: var(--form-muted, #64748b); font-size: 12px; }
+@media (max-width: 640px) {
+  .class-form-modal { max-height: calc(100dvh - 24px); width: calc(100vw - 20px); border-radius: 12px; }
+  .class-form-modal .class-modal-heading { padding: 18px; gap: 10px; }
+  .class-modal-symbol { display: none; }
+  .class-editor > fieldset { padding: 18px; }
+  .class-editor .class-grid { grid-template-columns: 1fr; }
+  .class-management .personnel-toolbar-actions { margin-left: 0; }
+}
+
+/* Only the create-class popup has a rectangular outer frame. */
+.classes-page.class-create-modal { width: min(1180px, calc(100vw - 40px)); max-width: none; border-radius: 0; }
+.class-create-modal .class-modal-heading > button { border: 0; background: transparent; box-shadow: none; }
+.class-create-modal .class-modal-heading > button:hover { background: var(--form-subtle); }
+.class-create-modal :is(.class-image-field, .class-upload-zone, .teacher-picker-table) { border-radius: 8px; }
+.class-image-field { grid-column: 1 / -1; display: grid; gap: 10px; padding: 16px; border: 1px solid var(--form-line, #dbe2ea); }
+.class-image-field strong { font-size: 14px; }
+.class-image-modes { display: flex; gap: 8px; }
+.class-image-modes button[aria-pressed=true] { color: #60a5fa; border-color: #3b82f6; background: #2563eb15; }
+.class-upload-zone { padding: 18px; border: 1px dashed var(--form-line, #94a3b8); background: var(--form-subtle, #f8fafc); }
+.class-image-preview { display: flex; align-items: center; gap: 16px; }
+.class-image-preview img { width: 180px; height: 100px; object-fit: cover; border: 1px solid var(--form-line, #dbe2ea); }
+.class-teacher-picker > p { color: var(--form-muted, #64748b); font-size: 13px; }
+.teacher-picker-table { margin-top: 16px; max-height: 310px; overflow: auto; border: 1px solid var(--form-line, #dbe2ea); }
+.teacher-picker-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.classes-page .teacher-picker-table th { position: sticky; top: 0; padding: 12px 16px; background: var(--form-subtle, #f1f5f9); color: var(--form-muted, #475569); border-bottom: 1px solid var(--form-line, #dbe2ea); }
+.classes-page .teacher-picker-table td { padding: 14px 16px; border-bottom: 1px solid var(--form-line, #dbe2ea); }
+.teacher-picker-table tr.is-selected { background: #2563eb15; }
+.teacher-picker-table input[type=checkbox] { width: 16px; height: 16px; min-height: 16px; accent-color: #2563eb; }
+@media (max-width: 640px) { .classes-page.class-create-modal { width: calc(100vw - 16px); } }

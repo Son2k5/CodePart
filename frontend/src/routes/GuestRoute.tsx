@@ -8,7 +8,7 @@ export const GuestRoute: React.FC = () => {
   if (user && accessToken) {
     if (user.role === 'Admin') return <Navigate to="/admin" replace />;
     if (user.role === 'Teacher') return <Navigate to="/teacher" replace />;
-    return <Navigate to="/courses" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <Outlet />;

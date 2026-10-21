@@ -20,6 +20,8 @@ export interface AdminUserItem {
   facultyId?: string | null;
   managedClasses?: { id: string; name: string; academicYear: string; studentCount: number }[];
   teachingCourses?: { id: string; subjectName: string; sectionCode: string; semester: string; capacity: number; enrolledCount: number }[];
+  enrolledClasses?: { id: string; name: string; academicYear: string }[];
+  enrolledCourses?: { id: string; subjectName: string; sectionCode: string; semester: string; teacherName?: string }[];
 }
 
 export type UserRoleFilter = 'ALL' | Role;

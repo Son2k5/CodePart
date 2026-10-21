@@ -6,15 +6,16 @@ interface OtpInputProps {
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  disabled?: boolean;
 }
 
-export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange, error }) => {
+export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange, error, disabled }) => {
   const otp = Array.from({ length }, (_, index) => value[index] ?? '');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const val = e.target.value;
-    if (isNaN(Number(val))) return;
+    if (!/^\d*$/.test(val)) return;
 
     const newOtp = [...otp];
     // Allow only last char if pasted multiple
@@ -36,7 +37,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').slice(0, length).split('');
-    if (pastedData.some(char => isNaN(Number(char)))) return;
+    if (pastedData.some(char => !/^\d$/.test(char))) return;
 
     const newOtp = [...otp];
     pastedData.forEach((char, idx) => {
@@ -53,20 +54,22 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
 
   return (
     <div className="flex flex-col items-center w-full">
-      <div className="flex gap-2 justify-center w-full" onPaste={handlePaste}>
+      <div className="auth-otp" role="group" aria-label="Mã xác thực 6 chữ số" onPaste={handlePaste}>
         {otp.map((digit, index) => (
           <input
             key={index}
             ref={(el) => { inputRefs.current[index] = el; }}
             type="text"
             inputMode="numeric"
+            aria-label={`Chữ số ${index + 1}`}
+            aria-invalid={!!error}
+            disabled={disabled}
+            autoComplete={index === 0 ? 'one-time-code' : 'off'}
             maxLength={1}
             value={digit}
             onChange={(e) => handleChange(e, index)}
             onKeyDown={(e) => handleKeyDown(e, index)}
-            className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-xl font-bold rounded-xl border-2 bg-transparent focus:outline-none transition-colors ${
-              error ? 'border-red-500 focus:border-red-600' : 'border-gray-200 focus:border-slate-900'
-            }`}
+            className="auth-input auth-otp-digit"
           />
         ))}
       </div>

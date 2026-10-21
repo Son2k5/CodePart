@@ -4,6 +4,7 @@ import type { LoginResponse } from '../features/auth/types/auth.types';
 import { isSessionIdle, markSessionEnded } from '../features/auth/sessionActivity';
 import { queryClient } from './queryClient';
 import { toast } from 'sonner';
+import { extractErrorDetails } from './errorService';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -118,6 +119,9 @@ axiosInstance.interceptors.response.use(
       }
     }
 
+    const details = extractErrorDetails(error);
+    (error as any).safeMessage = details.message;
+    (error as any).traceId = details.traceId;
     return Promise.reject(error);
   }
 );

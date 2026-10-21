@@ -87,7 +87,8 @@ public sealed class Judge0CodeExecutionService : ICodeExecutionService
                 return new(SubmissionStatus.SystemError, null, "Code execution service returned an invalid response.", null, null);
 
             var stdout = Decode(result.Stdout);
-            var error = FirstNotEmpty(Decode(result.CompileOutput), Decode(result.Stderr), Decode(result.Message));
+            var error = CodePath.Application.Judge.JudgeSanitizer.Sanitize(
+                FirstNotEmpty(Decode(result.CompileOutput), Decode(result.Stderr), Decode(result.Message)));
             int? runtimeMs = double.TryParse(result.Time, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
                 ? (int)Math.Ceiling(seconds * 1000)
                 : null;
