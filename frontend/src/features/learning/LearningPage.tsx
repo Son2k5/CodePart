@@ -7,7 +7,6 @@ import { axiosInstance as api } from '../../lib/axios';
 import { getErrorMessage } from '../../lib/errorService';
 import { useAuthStore } from '../auth/store/authStore';
 import { RagSources, type RagReference } from '../ai-assistant/RagSources';
-import './learning.css';
 
 const TeachingDraftPanel = lazy(() => import('./TeachingDraftPanel').then(m => ({ default: m.TeachingDraftPanel })));
 
@@ -53,14 +52,14 @@ export function LearningPage() {
       await Promise.all([chapters.refetch(), topics.refetch()]);
     } catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
-  return <main className="learning-page"><Link to={manage ? role === 'Admin' ? `/admin/classes/${classId}` : '/teacher/classes' : '/classes'}>← Danh sách lớp</Link>
+  return <main className="max-w-[1200px] my-2 mx-2 md:my-8 md:mx-auto p-4 md:p-6 text-[#203047] bg-white rounded-2xl shadow-sm [&_h1]:text-[1.8rem] [&_h1]:font-bold [&_h2]:text-[1.3rem] [&_h2]:font-semibold [&_h2]:my-4 [&_h3]:text-[1.1rem] [&_h3]:font-semibold [&_h3]:my-3 [&_p]:my-2.5 [&_button]:border [&_button]:border-[#c7d3df] [&_button]:rounded-lg [&_button]:px-3 [&_button]:py-2 [&_button]:bg-[#f3f7fb] [&_button]:cursor-pointer [&_button:disabled]:opacity-50 [&_button:disabled]:cursor-not-allowed [&_input]:block [&_input]:w-full [&_input]:border [&_input]:border-[#bdcad8] [&_input]:rounded-lg [&_input]:p-2.5 [&_input]:my-1.5 [&_select]:block [&_select]:w-full [&_select]:border [&_select]:border-[#bdcad8] [&_select]:rounded-lg [&_select]:p-2.5 [&_select]:my-1.5 [&_textarea]:block [&_textarea]:w-full [&_textarea]:border [&_textarea]:border-[#bdcad8] [&_textarea]:rounded-lg [&_textarea]:p-2.5 [&_textarea]:my-1.5 [&_textarea]:resize-y [&_pre]:overflow-auto [&_pre]:p-3 [&_pre]:bg-[#f1f5f9] [&_pre]:rounded-lg [&_a]:text-[#175cb8] [&_a]:underline [&_fieldset]:border [&_fieldset]:border-[#d6e0ea] [&_fieldset]:rounded-[10px] [&_fieldset]:p-[14px] [&_fieldset]:my-4 [&_[role=alert]]:text-[#a32222] [&_[role=status]]:text-[#126b43]"><Link to={manage ? role === 'Admin' ? `/admin/classes/${classId}` : '/teacher/classes' : '/classes'}>← Danh sách lớp</Link>
     <h1>Học liệu và trợ giảng</h1><p>Đọc bài học, tham khảo tài liệu và đặt câu hỏi theo nội dung của lớp.</p>
     {(chapters.isError || topics.isError) && <p role="alert">Không tải được học liệu. <button onClick={() => { void chapters.refetch(); if (manage) void topics.refetch(); }}>Thử lại</button></p>}
     {error && <p role="alert">{error}</p>}
-    {manage && <div className="learning-create"><form onSubmit={e => { e.preventDefault(); void create('chapter'); }}><label>Tên chương<input required maxLength={250} value={chapterTitle} onChange={e => setChapterTitle(e.target.value)} /></label><button disabled={busy}>Thêm chương</button></form>
+    {manage && <div className="flex flex-wrap gap-5 p-4 bg-[#f5f8fc] rounded-xl my-4 [&>form]:flex-1 [&>form]:min-w-[230px]"><form onSubmit={e => { e.preventDefault(); void create('chapter'); }}><label>Tên chương<input required maxLength={250} value={chapterTitle} onChange={e => setChapterTitle(e.target.value)} /></label><button disabled={busy}>Thêm chương</button></form>
       <form onSubmit={e => { e.preventDefault(); void create('topic'); }}><label>Chương<select value={chapterId || chapters.data?.[0]?.id || ''} onChange={e => setChapterId(e.target.value)}>{chapters.data?.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label><label>Tên bài học<input required maxLength={250} value={topicTitle} onChange={e => setTopicTitle(e.target.value)} /></label><button disabled={busy || !chapters.data?.length}>Thêm bài học</button></form></div>}
-    <div className="learning-layout"><nav aria-label="Danh sách bài học">{chapters.isPending ? <p>Đang tải…</p> : !chapters.data?.length ? <p>Chưa có học liệu.</p> : chapters.data.map(c => <section key={c.id}><h2>{c.title}</h2>{allTopics.filter(t => t.chapterId === c.id).map(t =>
-      <button key={t.id} disabled={!manage && !!t.lockedReason} aria-pressed={selected === t.id} onClick={() => setSelected(t.id)}>{t.title}{!manage && t.lockedReason ? ' · Chưa mở' : ''}</button>)}</section>)}</nav>
+    <div className="grid grid-cols-1 md:grid-cols-[230px_minmax(0,1fr)] gap-7 mt-6"><nav aria-label="Danh sách bài học">{chapters.isPending ? <p>Đang tải…</p> : !chapters.data?.length ? <p>Chưa có học liệu.</p> : chapters.data.map(c => <section key={c.id}><h2>{c.title}</h2>{allTopics.filter(t => t.chapterId === c.id).map(t =>
+      <button key={t.id} disabled={!manage && !!t.lockedReason} aria-pressed={selected === t.id} onClick={() => setSelected(t.id)} className={`block w-full text-left my-1.5 px-3 py-2 rounded-lg border transition-colors ${selected === t.id ? 'bg-[#e1edff] border-[#487cd1] font-medium' : 'bg-[#f3f7fb] border-[#c7d3df]'}`}>{t.title}{!manage && t.lockedReason ? ' · Chưa mở' : ''}</button>)}</section>)}</nav>
       <div>{current ? manage ? <TopicEditor key={current.id} topic={current} refresh={() => topics.refetch()} /> : <TopicReader key={current.id} classId={classId} topic={current} /> : <p>Chọn một bài học để bắt đầu.</p>}</div>
     </div>
   </main>;
@@ -108,10 +107,10 @@ function TopicEditor({ topic, refresh }: { topic: Topic; refresh: () => Promise<
       {b.type === 'Markdown' ? <textarea aria-label={`Nội dung ${i + 1}`} rows={12} maxLength={200000} disabled={busy} value={b.data.markdown ?? ''} onChange={e => setBlocks(old => old.map(x => x.blockId === b.blockId ? { ...x, data: { ...x.data, markdown: e.target.value } } : x))} /> : <p>{b.type === 'Pdf' ? `${b.data.pageCount} trang` : 'Nội dung đã có trong bài học'}</p>}
       <button disabled={busy} onClick={() => setBlocks(old => old.filter(x => x.blockId !== b.blockId))}>Gỡ khỏi bản nháp</button>
     </fieldset>)}
-    <div className="learning-actions"><button disabled={busy} onClick={() => setBlocks(old => [...old, { blockId: crypto.randomUUID(), type: 'Markdown', data: { markdown: '' } }])}>Thêm văn bản Markdown</button>
+    <div className="flex flex-wrap gap-2.5 items-center my-4 [&>label]:max-w-[280px]"><button disabled={busy} onClick={() => setBlocks(old => [...old, { blockId: crypto.randomUUID(), type: 'Markdown', data: { markdown: '' } }])}>Thêm văn bản Markdown</button>
       <label>Thêm PDF<input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e => { void upload(e.target.files?.[0]); e.target.value = ''; }} /></label>
       <button disabled={busy} onClick={() => void save(false)}>Lưu bản nháp</button><button disabled={busy || !blocks.length} onClick={() => void save(true)}>Lưu và công bố</button></div>
-    <section className="rag-status"><h3>Trợ giảng học liệu</h3>{status.isError ? <p>Chưa đọc được trạng thái. <button onClick={() => void status.refetch()}>Thử lại</button></p> : <>
+    <section className="p-[18px] border border-[#d3deeb] rounded-xl mt-5 bg-white"><h3>Trợ giảng học liệu</h3>{status.isError ? <p>Chưa đọc được trạng thái. <button onClick={() => void status.refetch()}>Thử lại</button></p> : <>
       <p>{status.data?.enabled === false ? 'Dịch vụ chưa được bật · ' : ''}{statusNames[status.data?.status ?? ''] ?? 'Đang tải…'}{status.data?.status === 'Ready' ? ` · ${status.data.chunks} đoạn học liệu` : ''}</p>
       {status.data?.errorCode && <p role="alert">{status.data.errorCode === 'PDF_NEEDS_OCR' ? 'PDF không có văn bản đọc được. Hãy dùng bản PDF có chữ hoặc chuyển OCR trước.' : `Mã xử lý: ${status.data.errorCode}`}</p>}
       <button disabled={busy || !status.data?.enabled || ['Pending', 'Processing'].includes(status.data?.status ?? '') || !topic.publishedVersion} onClick={() => void reindex()}>Xử lý lại học liệu</button>
@@ -150,7 +149,7 @@ function TopicAssistant({ topicId }: { topicId: string }) {
       setMatches(data); if (!data.length) setResult({ answer: 'Chưa tìm thấy đoạn học liệu phù hợp.', citations: [], groundingStatus: 'insufficient_context' }); }
     catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
-  return <section className="learning-assistant" aria-busy={busy}><h3>Hỏi trợ giảng về bài học</h3><p>Câu trả lời dựa trên học liệu được công bố mà bạn có quyền xem.</p>
+  return <section className="p-[18px] border border-[#d3deeb] rounded-xl mt-5 bg-white" aria-busy={busy}><h3>Hỏi trợ giảng về bài học</h3><p>Câu trả lời dựa trên học liệu được công bố mà bạn có quyền xem.</p>
     <form onSubmit={e => { e.preventDefault(); void ask(); }}><label>Câu hỏi<textarea required maxLength={2000} value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ví dụ: Điều kiện dừng vòng lặp được giải thích như thế nào?" /></label><button disabled={busy || !question.trim()}>{busy ? 'Đang tìm học liệu và kiểm tra câu trả lời…' : 'Gửi câu hỏi'}</button><button type="button" disabled={busy || !question.trim()} onClick={() => void search()}>Tìm trong bài học</button></form>
     {error && <p role="alert">{error}</p>}{result && <div aria-live="polite"><Markdown skipHtml rehypePlugins={[rehypeSanitize]}>{result.answer}</Markdown><RagSources sources={result.citations} /></div>}
     {matches.map(p => <section key={p.chunkId}><Markdown skipHtml rehypePlugins={[rehypeSanitize]}>{p.content}</Markdown><RagSources sources={[p]} /></section>)}

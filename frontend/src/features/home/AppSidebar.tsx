@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Code2, GraduationCap, Menu, Home, LogOut, Search, Users, X } from 'lucide-react';
+import { BookOpen, Code2, GraduationCap, Bell, Newspaper, Menu, Home, LogOut, Search, Users, X } from 'lucide-react';
+import { useAuthStore } from '../auth/store/authStore';
 import { useLogout } from '../auth/hooks/useAuth';
 
-const apps = [
+const studentApps = [
   { to: '/home', label: 'Bàn làm việc', icon: Home, color: 'from-blue-400 to-blue-600', group: 'Không gian của bạn' },
   { to: '/courses', label: 'Khóa học của tôi', icon: BookOpen, color: 'from-emerald-400 to-emerald-600', group: 'Học tập' },
   { to: '/classes', label: 'Khám phá lớp học', icon: Users, color: 'from-cyan-400 to-sky-600', group: 'Học tập' },
@@ -12,6 +13,14 @@ const apps = [
 const normalize = (value: string) => value.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
 
 export function AppSidebar() {
+  const role = useAuthStore(state => state.user?.role);
+  const home = role === 'Admin' ? '/admin/dashboard' : role === 'Teacher' ? '/teacher' : '/home';
+  const apps = role === 'Admin' ? [
+    { to: '/admin/classes', label: 'Không gian lớp học', icon: BookOpen, color: 'from-emerald-400 to-emerald-600', group: 'Lớp học' },
+  ] : role === 'Teacher' ? [
+    { to: '/teacher/courses', label: 'Lớp học phần', icon: BookOpen, color: 'from-emerald-400 to-emerald-600', group: 'Giảng dạy' },
+    { to: '/teacher/classes', label: 'Lớp được phân công', icon: Users, color: 'from-cyan-400 to-sky-600', group: 'Giảng dạy' },
+  ] : studentApps;
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -27,7 +36,7 @@ export function AppSidebar() {
       <div className="flex h-full bg-gradient-to-b from-[#e7ebf3] via-[#f3f3f3] to-[#f3f3f3] font-['Be_Vietnam_Pro',sans-serif]">
         <aside className="flex w-14 shrink-0 flex-col items-center gap-3 py-3 sm:w-16" aria-label="Thao tác nhanh">
           <button type="button" onClick={close} aria-label="Đóng danh sách ứng dụng" className="grid size-10 place-items-center rounded-full bg-white text-red-500 hover:bg-red-50"><X size={24} /></button>
-          <Link to="/home" onClick={close} aria-label="Về trang chủ" title="Trang chủ" className="mt-auto grid size-10 place-items-center rounded-full bg-white/70 text-slate-600 hover:bg-white"><Home size={23} /></Link>
+          <Link to={home} onClick={close} aria-label="Về trang chủ" title="Trang chủ" className="mt-auto grid size-10 place-items-center rounded-full bg-white/70 text-slate-600 hover:bg-white"><Home size={23} /></Link>
           <button type="button" aria-label="Đăng xuất" title="Đăng xuất" disabled={logout.isPending} onClick={() => { close(); logout.mutate(); }} className="grid size-10 place-items-center rounded-full bg-white/70 text-slate-600 hover:bg-white disabled:opacity-50"><LogOut size={22} /></button>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col pr-4 sm:pr-6">
@@ -43,7 +52,7 @@ export function AppSidebar() {
               </Link>)}
             </nav>
             {filtered.length === 0 && <p role="status" className="rounded-2xl bg-white/60 p-6 text-sm leading-6 text-slate-500">Không tìm thấy ứng dụng. Thử tìm “khóa học”, “lớp học” hoặc “luyện tập” nhé.</p>}
-            {['Không gian của bạn', 'Học tập'].map(group => {
+            {[...new Set(filtered.map(app => app.group))].map(group => {
               const items = filtered.filter(app => app.group === group);
               if (!items.length) return null;
               return <section key={group} className="mt-9" aria-label={group}>
@@ -55,6 +64,7 @@ export function AppSidebar() {
                 </nav>
               </section>;
             })}
+            {role !== 'Student' && !query.trim() && <section className="mt-9" aria-label="Tiện ích"><h3 className="mb-4 text-base font-semibold">Tiện ích</h3><div className="grid gap-3 sm:grid-cols-2">{[{ label: 'Tin tức', icon: Newspaper }, { label: 'Thông báo', icon: Bell }].map(({ label, icon: Icon }) => <div key={label} className="flex items-center gap-3 rounded-xl bg-white/40 p-3 text-slate-500"><Icon size={22} /><span>{label}<small className="mt-1 block text-xs">Sắp có</small></span></div>)}</div></section>}
             <div className="mt-10 flex items-start gap-3 rounded-2xl border border-white bg-white/40 p-4 text-xs leading-6 text-slate-500"><GraduationCap size={25} className="shrink-0 text-blue-500" /><p>CodePart — Không gian học tập của bạn.<br />Chọn một ứng dụng để bắt đầu nhé!</p></div>
           </div>
         </div>

@@ -16,12 +16,12 @@ const columns = [
   { id: 'name', label: 'Tên lớp học', width: 260, min: 160, sort: 'name' },
   { id: 'joinCode', label: 'Mã tham gia', width: 150, min: 110 },
   { id: 'accessType', label: 'Quyền tham gia', width: 160, min: 120 },
-  { id: 'status', label: 'Trạng thái', width: 170, min: 130 },
   { id: 'studentCount', label: 'Số sinh viên', width: 145, min: 110, sort: 'studentCount' },
   { id: 'teachers', label: 'Giáo viên phụ trách', width: 240, min: 150 },
   { id: 'startDate', label: 'Ngày bắt đầu', width: 145, min: 110 },
   { id: 'endDate', label: 'Ngày kết thúc', width: 145, min: 110 },
   { id: 'createdAt', label: 'Ngày tạo lớp', width: 145, min: 110, sort: 'createdAt' },
+  { id: 'status', label: 'Trạng thái', width: 170, min: 130 },
 ] as const;
 type ColumnId = typeof columns[number]['id'];
 type Panel = 'scope' | 'filters' | 'columns' | 'more' | 'add' | null;
@@ -52,13 +52,16 @@ export function ClassListPage() {
   const [deleting, setDeleting] = useState<ClassItem | null>(null);
   const [showOverview, setShowOverview] = useState(false);
   const [showNotice, setShowNotice] = useState(true);
-  const [compact, setCompact] = useState(false);
+  const [compact, setCompact] = useState(true);
   const [panel, setPanel] = useState<Panel>(null);
   const [hiddenColumns, setHiddenColumns] = useState<ColumnId[]>(['startDate', 'endDate', 'createdAt']);
   const [widths, setWidths] = useState<Partial<Record<ColumnId, number>>>({});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const actionsHeadingRef = useRef<HTMLTableCellElement>(null);
+  const [actionsInView, setActionsInView] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const resizeRef = useRef<{ id: ColumnId; start: number; width: number } | null>(null);
@@ -86,6 +89,17 @@ export function ClassListPage() {
   const changeStatus = (next: string) => { setStatus(next); changePage(1); setPanel(null); };
   const resetFilters = () => { setSearch(''); setAccess(''); setHasTeacher(''); changeStatus(''); setSort('createdAt'); setDesc(true); };
   const refresh = () => { void query.refetch(); for (const stat of stats) void stat.query.refetch(); setPanel(null); };
+  useEffect(() => {
+    const root = tableScrollRef.current;
+    const heading = actionsHeadingRef.current;
+    if (!root || !heading) return;
+    // The heading stays in the table flow, so it tracks the real action column.
+    const observer = new IntersectionObserver(([entry]) => {
+      setActionsInView(entry.isIntersecting && entry.intersectionRatio >= 0.99);
+    }, { root, threshold: [0, 0.99, 1] });
+    observer.observe(heading);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => { if (query.data && page > totalPages) { setPage(totalPages); setSelectedIds([]); } }, [query.data, page, totalPages]);
   useEffect(() => { if (selectAllRef.current) selectAllRef.current.indeterminate = selectedCount > 0 && selectedCount < items.length; }, [selectedCount, items.length]);
   useEffect(() => {
@@ -143,12 +157,12 @@ export function ClassListPage() {
           <button className="personnel-icon class-tool-button" aria-label={selectedIds.length ? 'Xuất lớp đã chọn CSV' : 'Xuất danh sách CSV'} title={exporting ? 'Đang xuất báo cáo…' : selectedIds.length ? 'Xuất lớp đã chọn CSV' : 'Xuất danh sách CSV'} disabled={exporting || query.isLoading || query.isError} onClick={() => void exportCSV()}><FileOutput size={15} /><span>{exporting ? 'Đang xuất…' : 'Xuất báo cáo'}</span></button>
         </div>
       </div>
-      <div className={`personnel-table-scroll ${compact ? '' : 'personnel-comfortable'}`}>
+      <div ref={tableScrollRef} className={`personnel-table-scroll ${compact ? '' : 'personnel-comfortable'} ${actionsInView ? 'class-actions-in-view' : 'class-actions-offscreen'}`}>
         <table style={{ width: 236 + visibleColumns.reduce((sum, c) => sum + (widths[c.id] ?? c.width), 0) }}>
           <caption className="personnel-sr-only">Danh sách lớp học. Kéo mép phải tiêu đề cột hoặc dùng phím mũi tên để thay đổi độ rộng.</caption>
           <colgroup><col style={{ width: 48 }} /><col style={{ width: 64 }} />{visibleColumns.map(c => <col key={c.id} style={{ width: widths[c.id] ?? c.width }} />)}<col style={{ width: 124 }} /></colgroup>
-          <thead><tr><th className="personnel-checkbox-cell"><input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={items.length > 0 && selectedCount === items.length} onChange={e => setSelectedIds(e.target.checked ? items.map(c => c.id) : [])} /></th><th scope="col" className="class-number-cell">STT</th>{visibleColumns.map(c => <th key={c.id} scope="col" aria-sort={'sort' in c && sort === c.sort ? desc ? 'descending' : 'ascending' : 'none'}><button className="personnel-column-title" disabled={!('sort' in c)} onClick={() => { if ('sort' in c) { setSort(c.sort); setDesc(sort === c.sort ? !desc : false); changePage(1); } }}><span>{c.label}</span>{'sort' in c && sort === c.sort && <span>{desc ? '↓' : '↑'}</span>}</button><span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${c.label}`} aria-orientation="vertical" aria-valuemin={c.min} aria-valuemax={600} aria-valuenow={widths[c.id] ?? c.width} tabIndex={0} onPointerDown={e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); resizeRef.current = { id: c.id, start: e.clientX, width: widths[c.id] ?? c.width }; rootRef.current?.classList.add('personnel-resizing'); }} onPointerMove={e => { const r = resizeRef.current; if (r?.id === c.id) setWidths(current => ({ ...current, [c.id]: Math.max(c.min, Math.min(600, r.width + e.clientX - r.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths(current => ({ ...current, [c.id]: c.width }))} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setWidths(current => ({ ...current, [c.id]: Math.max(c.min, Math.min(600, (current[c.id] ?? c.width) + (e.key === 'ArrowRight' ? 16 : -16))) })); } }} /></th>)}<th scope="col" className="class-actions-heading">Thao tác</th></tr></thead>
-          <tbody>{items.map((item, index) => <tr key={item.id} className={selectedIds.includes(item.id) ? 'is-selected' : ''} onDoubleClick={() => openForm(item)}><td className="personnel-checkbox-cell"><input type="checkbox" aria-label={`Chọn ${item.name}`} checked={selectedIds.includes(item.id)} onChange={e => setSelectedIds(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /></td><td className="class-number-cell">{start + index + 1}</td>{visibleColumns.map(c => <td key={c.id} title={valueFor(item, c.id)}>{c.id === 'name' ? <Link className="personnel-name" to={`/admin/classes/${item.id}`}><span>{item.name}</span></Link> : c.id === 'status' ? <span className={`personnel-status status-${item.status === 'Draft' ? 'Pending' : item.status === 'Archived' ? 'Disabled' : 'Active'}`}><i /><span>{statusLabels[item.status]}</span></span> : valueFor(item, c.id)}</td>)}<td className="class-actions-cell" onDoubleClick={e => e.stopPropagation()}><div className="class-row-actions"><Link className="personnel-row-action-btn" title="Xem chi tiết lớp học" aria-label={`Xem ${item.name}`} to={`/admin/classes/${item.id}`}><Eye size={15} /></Link><button className="personnel-row-action-btn edit" title="Chỉnh sửa lớp học" aria-label={`Chỉnh sửa ${item.name}`} onClick={() => openForm(item)}><Edit3 size={15} /></button><button className="personnel-row-action-btn danger" title="Xóa lớp học" aria-label={`Xóa ${item.name}`} onClick={() => setDeleting(item)}><Trash2 size={15} /></button></div></td></tr>)}</tbody>
+          <thead><tr><th className="personnel-checkbox-cell"><input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={items.length > 0 && selectedCount === items.length} onChange={e => setSelectedIds(e.target.checked ? items.map(c => c.id) : [])} /></th><th scope="col" className="class-number-cell">STT</th>{visibleColumns.map(c => <th key={c.id} className={c.id === 'status' ? 'personnel-status-cell' : undefined} scope="col" aria-sort={'sort' in c && sort === c.sort ? desc ? 'descending' : 'ascending' : 'none'}><button className="personnel-column-title" disabled={!('sort' in c)} onClick={() => { if ('sort' in c) { setSort(c.sort); setDesc(sort === c.sort ? !desc : false); changePage(1); } }}><span>{c.label}</span>{'sort' in c && sort === c.sort && <span>{desc ? '↓' : '↑'}</span>}</button><span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${c.label}`} aria-orientation="vertical" aria-valuemin={c.min} aria-valuemax={600} aria-valuenow={widths[c.id] ?? c.width} tabIndex={0} onPointerDown={e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); resizeRef.current = { id: c.id, start: e.clientX, width: widths[c.id] ?? c.width }; rootRef.current?.classList.add('personnel-resizing'); }} onPointerMove={e => { const r = resizeRef.current; if (r?.id === c.id) setWidths(current => ({ ...current, [c.id]: Math.max(c.min, Math.min(600, r.width + e.clientX - r.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths(current => ({ ...current, [c.id]: c.width }))} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setWidths(current => ({ ...current, [c.id]: Math.max(c.min, Math.min(600, (current[c.id] ?? c.width) + (e.key === 'ArrowRight' ? 16 : -16))) })); } }} /></th>)}<th ref={actionsHeadingRef} scope="col" className="class-actions-heading">Thao tác</th></tr></thead>
+          <tbody>{items.map((item, index) => <tr key={item.id} className={selectedIds.includes(item.id) ? 'is-selected' : ''} onDoubleClick={() => openForm(item)}><td className="personnel-checkbox-cell"><input type="checkbox" aria-label={`Chọn ${item.name}`} checked={selectedIds.includes(item.id)} onChange={e => setSelectedIds(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} /></td><td className="class-number-cell">{start + index + 1}</td>{visibleColumns.map(c => <td key={c.id} className={c.id === 'status' ? 'personnel-status-cell' : undefined} title={valueFor(item, c.id)}>{c.id === 'name' ? <Link className="personnel-name" to={`/admin/classes/${item.id}`}><span>{item.name}</span></Link> : c.id === 'status' ? <span className={`personnel-status status-${item.status === 'Draft' ? 'Pending' : item.status === 'Archived' ? 'Disabled' : 'Active'}`}><i /><span>{statusLabels[item.status]}</span></span> : valueFor(item, c.id)}</td>)}<td className="class-actions-cell" onDoubleClick={e => e.stopPropagation()}><div className="class-row-actions"><Link className="personnel-row-action-btn" title="Xem chi tiết lớp học" aria-label={`Xem ${item.name}`} to={`/admin/classes/${item.id}`}><Eye size={15} /></Link><button className="personnel-row-action-btn edit" title="Chỉnh sửa lớp học" aria-label={`Chỉnh sửa ${item.name}`} onClick={() => openForm(item)}><Edit3 size={15} /></button><button className="personnel-row-action-btn danger" title="Xóa lớp học" aria-label={`Xóa ${item.name}`} onClick={() => setDeleting(item)}><Trash2 size={15} /></button></div></td></tr>)}</tbody>
         </table>
         {!items.length && !query.isLoading && !query.isError && <div className="personnel-empty"><Search size={28} /><strong>Không tìm thấy lớp học</strong><p>Thử từ khóa khác hoặc đặt lại bộ lọc.</p><button onClick={resetFilters}>Đặt lại bộ lọc</button></div>}
       </div>

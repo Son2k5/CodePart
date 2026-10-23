@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { MemberFooterLayout } from './features/home/MemberFooter';
+import './features/home/member-home.css';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { GuestRoute } from './routes/GuestRoute';
 import { ProtectedRoute } from './routes/ProtectedRoute';
@@ -109,9 +111,11 @@ const router = createBrowserRouter([
           {
             element: <RoleGuard allowedRoles={['Student']} />,
             children: [
+              { element: <MemberFooterLayout />, children: [
               { path: '/home', lazy: async () => ({ Component: (await import('./features/home/HomePage')).HomePage }) },
               { path: '/courses', lazy: async () => ({ Component: (await import('./features/teacher/pages/StudentCoursesPage')).StudentCoursesPage }) },
               { path: '/classes', lazy: async () => ({ Component: (await import('./features/classes/PublicClassesPage')).PublicClassesPage }) },
+              ] },
               {
                 path: '/exercise/:slug',
                 lazy: async () => {
@@ -123,7 +127,7 @@ const router = createBrowserRouter([
           },
           { element: <RoleGuard allowedRoles={['Admin', 'Teacher']} />, children: [{ path: '/manage/problems', lazy: async () => ({ Component: (await import('./features/code-judge/JudgeAdminPage')).JudgeAdminPage }) }] },
           { element: <RoleGuard allowedRoles={['Student']} />, children: [
-            { path: '/problems', lazy: async () => ({ Component: (await import('./features/code-judge/ProblemListPage')).ProblemListPage }) },
+            { element: <MemberFooterLayout />, children: [{ path: '/problems', lazy: async () => ({ Component: (await import('./features/code-judge/ProblemListPage')).ProblemListPage }) }] },
             { path: '/classes/:classId/topics/:slug/problems/:problemId', lazy: async () => ({ Component: (await import('./features/workspace/WorkspacePage')).WorkspacePage }) },
             { path: '/problems/:id', lazy: async () => ({ Component: (await import('./features/workspace/WorkspacePage')).WorkspacePage }) },
           ] },

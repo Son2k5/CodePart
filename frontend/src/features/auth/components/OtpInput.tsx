@@ -54,7 +54,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
 
   return (
     <div className="flex flex-col items-center w-full">
-      <div className="auth-otp" role="group" aria-label="Mã xác thực 6 chữ số" onPaste={handlePaste}>
+      <div className="grid grid-cols-6 gap-2 w-full" role="group" aria-label="Mã xác thực 6 chữ số" onPaste={handlePaste}>
         {otp.map((digit, index) => (
           <input
             key={index}
@@ -69,7 +69,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({ length = 6, value, onChange,
             value={digit}
             onChange={(e) => handleChange(e, index)}
             onKeyDown={(e) => handleKeyDown(e, index)}
-            className="auth-input auth-otp-digit"
+            className="block w-full min-w-0 border border-[#dce8e9] rounded-[12px] py-3.5 px-0 text-center text-[22px] font-[650] text-[#354f55] bg-[#fbfdfd] transition-all focus:outline-none focus:border-[#70aeb9] focus:ring-3 focus:ring-[#e6f5f8] focus:bg-white aria-invalid:border-[#d65c5c]"
           />
         ))}
       </div>

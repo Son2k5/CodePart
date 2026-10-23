@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns2, Eye, EyeOff, FileOutput, Filter, List, Megaphone, MoreHorizontal, Plus, RotateCcw, Search, Settings2, Users, UserCheck, Clock, Lock, X, Trash2, Edit3 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Columns2, Eye, EyeOff, FileOutput, Filter, List, Megaphone, MoreHorizontal, Plus, RotateCcw, Search, Settings2, Users, UserCheck, Clock, Lock, Unlock, X, Trash2, Edit3 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AdminUserItem } from '../types/admin.types';
 import { UserDetailModal } from '../components/UserDetailModal';
@@ -70,6 +70,21 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const [editingUser, setEditingUser] = useState<AdminUserItem | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const actionsHeadingRef = useRef<HTMLTableCellElement>(null);
+  const [actionsInView, setActionsInView] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  useEffect(() => {
+    const root = tableScrollRef.current;
+    const heading = actionsHeadingRef.current;
+    if (!root || !heading) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setActionsInView(entry.isIntersecting && entry.intersectionRatio >= 0.99);
+    }, { root, threshold: [0, 0.99, 1] });
+    observer.observe(heading);
+    return () => observer.disconnect();
+  }, []);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const resizeRef = useRef<{ id: ColumnId; start: number; width: number; min: number } | null>(null);
   const panelTrigger = useRef<HTMLElement | null>(null);
@@ -138,9 +153,11 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const currentPage = page;
   const start = (currentPage - 1) * pageSize;
   const pageUsers = users;
+  const selectedUsers = pageUsers.filter(user => selectedIds.includes(user.id));
+  const canUnlockSelected = selectedUsers.length > 0 && selectedUsers.length === selectedIds.length && selectedUsers.every(user => user.status === 'Disabled');
 
   useEffect(() => {
-    if (currentQuery.data && page > totalPages) setPage(totalPages);
+    if (currentQuery.data && page > totalPages) { setPage(totalPages); setSelectedIds([]); }
   }, [currentQuery.data, page, totalPages]);
 
   const pageSelected = pageUsers.filter((user) => selectedIds.includes(user.id)).length;
@@ -162,7 +179,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     setStatus(next); changePage(1); setPanel(null); setSelectedIds([]);
     setSearchParams(next === 'Pending' ? { tab: 'pending' } : next === 'Disabled' ? { tab: 'disabled' } : {}, { replace: true });
   };
-  const resetFilters = () => { setQuery(''); setDepartment(''); changeStatus('ALL'); };
+  const resetFilters = () => { setQuery(''); setDepartment(''); setSort(null); changeStatus('ALL'); };
   const beginResize = (event: ReactPointerEvent<HTMLSpanElement>, column: Column) => {
     event.preventDefault(); event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -172,6 +189,8 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const endResize = () => { resizeRef.current = null; rootRef.current?.classList.remove('personnel-resizing'); };
 
   const exportCSV = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       if (isStudent) {
         await adminStudentApi.export(filter);
@@ -181,6 +200,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
+    setExporting(false);
     setPanel(null);
   };
 
@@ -207,6 +227,24 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
       toast.success(`Đã lưu hồ sơ ${roleLabel}`);
     } catch (error) {
       toast.error(getErrorMessage(error));
+    }
+  };
+
+  const unlockSelected = async () => {
+    if (unlocking || mutations.busy || !canUnlockSelected) return;
+    setUnlocking(true);
+    let completed = 0;
+    try {
+      for (const user of selectedUsers) {
+        await mutations.action.mutateAsync({ id: user.id, action: 'enable' });
+        completed++;
+        setSelectedIds(current => current.filter(id => id !== user.id));
+      }
+      toast.success(`Đã mở khóa ${completed} ${roleLabel}`);
+    } catch (error) {
+      toast.error(`Đã mở khóa ${completed}/${selectedUsers.length} tài khoản. ${getErrorMessage(error)}`);
+    } finally {
+      setUnlocking(false);
     }
   };
 
@@ -257,7 +295,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   };
 
   return (
-    <div ref={rootRef} className="personnel-page">
+    <div ref={rootRef} className="personnel-page personnel-management">
       {currentQuery.isPending && <p role="status">Đang tải danh sách {roleLabel}…</p>}
       {(currentQuery.error || currentStats.error || faculties.error || currentDetail.error) && (
         <p role="alert">
@@ -308,6 +346,30 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
         </div>
 
         <div className="personnel-actions">
+          {selectedIds.length > 0 && (
+            <div className="personnel-bulk-actions" aria-label="Thao tác với tài khoản đã chọn">
+              <button
+                type="button"
+                className="personnel-bulk-lock"
+                disabled={unlocking || mutations.busy || (!canUnlockSelected && !selectedUsers.every(user => user.status === 'Active'))}
+                onClick={() => void (canUnlockSelected ? unlockSelected() : bulkAction('disable'))}
+              >
+                {canUnlockSelected ? <Unlock size={14} /> : <Lock size={14} />}{unlocking ? 'Đang mở khóa…' : canUnlockSelected ? `Mở khóa (${selectedIds.length})` : `Khóa (${selectedIds.length})`}
+              </button>
+              <button
+                type="button"
+                className="personnel-btn-danger"
+                disabled={mutations.busy || unlocking}
+                onClick={() => setDeleteConfirm({
+                  ids: selectedIds,
+                  title: `Xóa ${selectedIds.length} ${roleLabel} đã chọn?`,
+                  description: `Hành động này sẽ xóa vĩnh viễn dữ liệu của ${selectedIds.length} tài khoản khỏi hệ thống và không thể hoàn tác.`
+                })}
+              >
+                <Trash2 size={14} />Xóa ({selectedIds.length})
+              </button>
+            </div>
+          )}
           <button
             type="button"
             className="personnel-overview-toggle"
@@ -416,39 +478,17 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
             </select>
             <ChevronDown size={14} />
           </div>
-          {selectedIds.length > 0 && <>
-            <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Pending' && (isStudent || u.emailVerifiedAt))} onClick={() => void bulkAction('approve')}>Duyệt đã chọn</button>
-            <button disabled={mutations.busy || !pageUsers.filter(u => selectedIds.includes(u.id)).every(u => u.status === 'Active')} onClick={() => void bulkAction('disable')}>Khóa đã chọn</button>
-            <button
-              className="personnel-btn-danger"
-              disabled={mutations.busy}
-              onClick={() => setDeleteConfirm({
-                ids: selectedIds,
-                title: `Xóa ${selectedIds.length} ${roleLabel} đã chọn?`,
-                description: `Hành động này sẽ xóa vĩnh viễn dữ liệu của ${selectedIds.length} tài khoản khỏi hệ thống và không thể hoàn tác.`
-              })}
-            >
-              <Trash2 size={13} />
-              Xóa đã chọn
-            </button>
-          </>}
-          {selectedIds.length > 0 && (
-            <button className="personnel-selection-badge" onClick={() => setSelectedIds([])}>
-              Đã chọn {selectedIds.length}
-              <X size={12} />
-            </button>
-          )}
           <div className="personnel-toolbar-actions">
             <div className="personnel-menu-anchor" data-personnel-menu>
               <button
                 type="button"
-                className={`personnel-icon ${status !== 'ALL' || panel === 'filters' ? 'is-active' : ''}`}
+                className={`personnel-icon class-tool-button ${status !== 'ALL' || panel === 'filters' ? 'is-active' : ''}`}
                 aria-label="Lọc trạng thái hồ sơ"
                 title="Bộ lọc trạng thái"
                 aria-expanded={panel === 'filters'}
                 onClick={(event) => togglePanel('filters', event.currentTarget)}
               >
-                <Filter size={15} />
+                <Filter size={15} /><span>Bộ lọc</span>
                 {status !== 'ALL' && <span className="personnel-filter-dot" />}
               </button>
               {panel === 'filters' && (
@@ -480,13 +520,13 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
             <div className="personnel-menu-anchor" data-personnel-menu>
               <button
                 type="button"
-                className={`personnel-icon ${panel === 'columns' ? 'is-active' : ''}`}
+                className={`personnel-icon class-tool-button ${panel === 'columns' ? 'is-active' : ''}`}
                 aria-label="Cài đặt cột hiển thị"
                 title="Cài đặt cột"
                 aria-expanded={panel === 'columns'}
                 onClick={(event) => togglePanel('columns', event.currentTarget)}
               >
-                <Settings2 size={15} />
+                <Settings2 size={15} /><span>Cột hiển thị</span>
               </button>
               {panel === 'columns' && (
                 <div className="personnel-popover personnel-column-options">
@@ -510,31 +550,33 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
 
             <button
               type="button"
-              className="personnel-icon"
+              className="personnel-icon class-tool-button"
+              disabled={exporting || currentQuery.isPending || currentQuery.isError}
               aria-label="Xuất danh sách CSV"
               title="Xuất danh sách CSV"
               onClick={exportCSV}
             >
-              <FileOutput size={15} />
+              <FileOutput size={15} /><span>{exporting ? 'Đang xuất…' : 'Xuất báo cáo'}</span>
             </button>
           </div>
         </div>
 
-        <div className={`personnel-table-scroll ${compact ? '' : 'personnel-comfortable'}`}>
-          <table style={{ width: 48 + 80 + visibleColumns.reduce((total, column) => total + (widths[column.id] ?? column.width), 0) }}>
+        <div ref={tableScrollRef} className={`personnel-table-scroll ${compact ? '' : 'personnel-comfortable'} ${actionsInView ? 'class-actions-in-view' : 'class-actions-offscreen'}`}>
+          <table style={{ width: 48 + 64 + 124 + visibleColumns.reduce((total, column) => total + (widths[column.id] ?? column.width), 0) }}>
             <caption className="personnel-sr-only">Danh sách {roleLabel}. Kéo mép phải tiêu đề cột hoặc dùng phím mũi tên để thay đổi độ rộng.</caption>
             <colgroup>
-              <col style={{ width: 48 }} />
+              <col style={{ width: 48 }} /><col style={{ width: 64 }} />
               {visibleColumns.map((column) => <col key={column.id} style={{ width: widths[column.id] ?? column.width }} />)}
-              <col style={{ width: 80 }} />
+              <col style={{ width: 124 }} />
             </colgroup>
             <thead>
               <tr>
                 <th className="personnel-checkbox-cell">
                   <input ref={selectAllRef} type="checkbox" aria-label="Chọn tất cả dòng trên trang" checked={pageUsers.length > 0 && pageSelected === pageUsers.length} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, ...pageUsers.map((user) => user.id)])] : current.filter((id) => !pageUsers.some((user) => user.id === id)))} />
                 </th>
+                <th scope="col" className="class-number-cell">STT</th>
                 {visibleColumns.map((column) => (
-                  <th key={column.id} scope="col" aria-sort={sort?.id === column.id ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}>
+                  <th key={column.id} className={column.id === 'status' ? 'personnel-status-cell' : undefined} scope="col" aria-sort={sort?.id === column.id ? sort.direction === 1 ? 'ascending' : 'descending' : 'none'}>
                     <button className="personnel-column-title" disabled={column.id !== 'name' && column.id !== 'created'} onClick={() => { changePage(1); setSort((current) => ({ id: column.id, direction: current?.id === column.id && current.direction === 1 ? -1 : 1 })); }}>
                       <span>{column.label}</span>
                       {sort?.id === column.id && <span>{sort.direction === 1 ? '↑' : '↓'}</span>}
@@ -542,7 +584,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                     <span className="personnel-resize-handle" role="separator" aria-label={`Độ rộng cột ${column.label}`} aria-orientation="vertical" aria-valuemin={column.min} aria-valuemax={600} aria-valuenow={widths[column.id] ?? column.width} tabIndex={0} onPointerDown={(event) => beginResize(event, column)} onPointerMove={(event) => { const resizing = resizeRef.current; if (resizing?.id === column.id) setWidths((current) => ({ ...current, [column.id]: Math.max(resizing.min, Math.min(600, resizing.width + event.clientX - resizing.start)) })); }} onPointerUp={endResize} onPointerCancel={endResize} onLostPointerCapture={endResize} onDoubleClick={() => setWidths((current) => ({ ...current, [column.id]: column.width }))} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); setWidths((current) => ({ ...current, [column.id]: Math.max(column.min, Math.min(600, (current[column.id] ?? column.width) + (event.key === 'ArrowRight' ? 16 : -16))) })); } }} />
                   </th>
                 ))}
-                <th scope="col" style={{ width: 80, textAlign: 'center' }}>Thao tác</th>
+                <th ref={actionsHeadingRef} scope="col" className="class-actions-heading">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -551,8 +593,9 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                   <td className="personnel-checkbox-cell">
                     <input type="checkbox" aria-label={`Chọn ${user.fullName}`} checked={selectedIds.includes(user.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} />
                   </td>
+                  <td className="class-number-cell">{start + index + 1}</td>
                   {visibleColumns.map((column) => (
-                    <td key={column.id} title={String(valueFor(user, column.id))}>
+                    <td key={column.id} className={column.id === 'status' ? 'personnel-status-cell' : undefined} title={String(valueFor(user, column.id))}>
                       {column.id === 'name' ? (
                         <button className="personnel-name" onClick={() => setSelectedUser(user)}>
                           <span className="personnel-avatar" style={{ background: avatarColors[(start + index) % avatarColors.length] }}>
@@ -571,7 +614,9 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                       )}
                     </td>
                   ))}
-                  <td className="personnel-actions-cell" onClick={(e) => e.stopPropagation()}>
+                  <td className="class-actions-cell" onDoubleClick={(e) => e.stopPropagation()}>
+                    <div className="class-row-actions">
+                    <button type="button" className="personnel-row-action-btn" title="Xem hồ sơ" aria-label={`Xem ${user.fullName}`} onClick={() => setSelectedUser(user)}><Eye size={15} /></button>
                     <button
                       type="button"
                       className="personnel-row-action-btn edit"
@@ -579,7 +624,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                       aria-label="Chỉnh sửa hồ sơ"
                       onClick={() => { setEditingUser(user); setFormOpen(true); }}
                     >
-                      <Edit3 size={13} />
+                      <Edit3 size={15} />
                     </button>
                     <button
                       type="button"
@@ -594,8 +639,9 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                         });
                       }}
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={15} />
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}

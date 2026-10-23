@@ -12,4 +12,5 @@
 }
 @layer utilities {
   .font-poppins, .font-nunito { font-family: var(--font-sans); }
+  .ai-suspected-line { background: #fff2c7 !important; border-left: 3px solid #d9a441; }
 }

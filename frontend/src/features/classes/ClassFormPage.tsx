@@ -4,7 +4,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { BookOpen, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { axiosInstance } from '../../lib/axios';
 import { teacherError } from '../admin/api/adminTeacherApi';
 import './class-management.css';
@@ -100,8 +100,8 @@ export function ClassFormModal({ initial, onClose }: { initial?: ClassItem; onCl
     document.body.style.overflow = 'hidden';
     return () => { dialog?.close(); document.body.style.overflow = overflow; previous?.focus(); };
   }, []);
-  return <dialog ref={dialogRef} className={`class-form-modal classes-page ${initial ? '' : 'class-create-modal'}`} aria-labelledby="class-form-title" onCancel={e => { e.preventDefault(); if (!busyRef.current) onClose(); }}>
-    <header className="class-modal-heading">{initial && <span className="class-modal-symbol"><BookOpen size={24} /></span>}<div><h1 id="class-form-title">{initial ? 'Chỉnh sửa lớp học' : 'Thêm lớp học'}</h1><p>{initial ? 'Cập nhật thông tin và phân công giáo viên.' : 'Tạo lớp mới, thiết lập lịch học và phân công giáo viên.'}</p></div><button type="button" aria-label="Đóng biểu mẫu" disabled={busy} onClick={onClose}><X size={20} /></button></header>
+  return <dialog ref={dialogRef} className="class-form-modal classes-page" aria-labelledby="class-form-title" onCancel={e => { e.preventDefault(); if (!busyRef.current) onClose(); }}>
+    <header className="class-modal-heading"><div><h1 id="class-form-title">{initial ? 'Chỉnh sửa lớp học' : 'Thêm lớp học'}</h1><p>{initial ? 'Cập nhật thông tin và phân công giáo viên.' : 'Tạo lớp mới, thiết lập lịch học và phân công giáo viên.'}</p></div><button type="button" aria-label="Đóng biểu mẫu" disabled={busy} onClick={onClose}><X size={20} /></button></header>
     <ClassForm initial={initial} onSaved={onClose} onCancel={onClose} onBusy={value => { busyRef.current = value; setBusy(value); }} />
   </dialog>;
 }

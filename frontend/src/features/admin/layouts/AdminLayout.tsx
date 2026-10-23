@@ -14,7 +14,6 @@ export function AdminLayout() {
   useEffect(() => {
     try { localStorage.setItem('codepart-admin-theme', theme); } catch { /* Keep the in-memory preference. */ }
   }, [theme]);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const closeMobile = useCallback(() => setIsMobileSidebarOpen(false), []);
   useEffect(() => {
@@ -24,15 +23,16 @@ export function AdminLayout() {
     return () => desktop.removeEventListener('change', resize);
   }, [closeMobile]);
   const toggleSidebar = () => {
-    if (window.matchMedia('(min-width: 1024px)').matches) setIsSidebarCollapsed((value) => !value);
-    else setIsMobileSidebarOpen((value) => !value);
+    setIsMobileSidebarOpen((value) => !value);
   };
-  return <div data-theme={theme} className="admin-shell flex min-h-dvh bg-[#ededf0] text-sm text-neutral-800 antialiased [&_button:disabled]:cursor-wait [&_button:disabled]:opacity-50">
+  return <div data-theme={theme} className="admin-shell flex flex-col min-h-dvh bg-[#ededf0] text-sm text-neutral-800 antialiased [&_button:disabled]:cursor-wait [&_button:disabled]:opacity-50">
     <a href="#admin-main-content" className="fixed -top-25 left-5 z-100 bg-white p-3 text-neutral-900 focus:top-3">Chuyển đến nội dung</a>
-    <AdminSidebar isCollapsed={isSidebarCollapsed} isMobileOpen={isMobileSidebarOpen} onCloseMobile={closeMobile} />
-    <div className="min-w-0 flex-1 flex flex-col bg-[#ededf0]">
-      <AdminHeader theme={theme} onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} onToggleSidebar={toggleSidebar} isSidebarCollapsed={isSidebarCollapsed} isMobileSidebarOpen={isMobileSidebarOpen} />
-      <main id="admin-main-content" className="flex-1 w-full p-4 sm:p-6" tabIndex={-1}><Outlet /></main>
+    <AdminHeader theme={theme} onToggleTheme={() => setTheme((current) => current === 'light' ? 'dark' : 'light')} onToggleSidebar={toggleSidebar} isMobileSidebarOpen={isMobileSidebarOpen} />
+    <div className="flex min-w-0 flex-1">
+      <AdminSidebar isCollapsed={false} isMobileOpen={isMobileSidebarOpen} onCloseMobile={closeMobile} />
+      <div className="min-w-0 flex-1 flex flex-col bg-[#ededf0]">
+        <main id="admin-main-content" className="flex-1 w-full p-4 sm:p-6" tabIndex={-1}><Outlet /></main>
+      </div>
     </div>
   </div>;
 }

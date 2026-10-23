@@ -22,25 +22,31 @@ public sealed class JudgeService(JudgeDbContext db, IJudgeAccess access, ICodeEx
     {
         var p = await Find(id, a, manage, ct);
         if (p == null) return Fail("Problem not found.", "NOT_FOUND");
-        return Result<object>.Success(new { p.Id, p.Title, p.Description, p.Difficulty, p.TimeLimitMs, p.MemoryLimitMb, p.Points,
+        return Result<object>.Success(new { p.Id, p.Title, p.Description, p.Category, p.Difficulty, p.TimeLimitMs, p.MemoryLimitMb, p.Points,
             p.CourseId, p.ClassId, Status = p.Status.ToString(), p.ComparisonMode, StarterCodes = p.StarterCodes.Select(x => new StarterDto(x.Language, x.Template)),
             TestCases = p.TestCases.Where(t => manage || t.IsSample).OrderBy(t => t.Order).Select(t => new { t.Id, t.Input, t.ExpectedOutput, t.IsSample, t.Order, t.Weight }) });
     }
-    public async Task<Result<object>> ListProblems(Actor a, bool manage, int page, CancellationToken ct, Guid? courseId = null, Guid? classId = null)
+    public async Task<Result<object>> ListProblems(Actor a, bool manage, int page, CancellationToken ct, Guid? courseId = null, Guid? classId = null, bool library = false, string? search = null, string? difficulty = null, string? category = null, string? language = null)
     {
+        if (library && (courseId.HasValue || classId.HasValue)) return Fail("Library cannot be combined with a class or course.");
         if (courseId.HasValue && classId.HasValue) return Fail("Choose one class or course.");
         if ((courseId.HasValue || classId.HasValue) && !await access.CanAccess(courseId, classId, a, manage, ct)) return Fail("Class not found.", "NOT_FOUND");
-        var scopes = await access.Scopes(a, manage, ct);
+        var scopes = library ? Array.Empty<JudgeScope>() : await access.Scopes(a, manage, ct);
         var courses = scopes.Where(s => s.Kind == "course").Select(s => s.Id).ToArray();
         var classes = scopes.Where(s => s.Kind == "class").Select(s => s.Id).ToArray();
         var q = db.Problems.AsNoTracking().Where(p =>
             (p.CourseId.HasValue && courses.Contains(p.CourseId.Value) || p.ClassId.HasValue && classes.Contains(p.ClassId.Value)
                 || p.CourseId == null && p.ClassId == null && (!manage || a.IsAdmin || a.IsTeacher && p.CreatedBy == a.Id))
             && (manage || p.Status == ProblemStatus.Published));
+        if (library) q = q.Where(p => p.CourseId == null && p.ClassId == null);
+        if (!string.IsNullOrWhiteSpace(search)) { var term = search.Trim(); q = q.Where(p => p.Title.Contains(term)); }
+        if (!string.IsNullOrWhiteSpace(difficulty)) q = q.Where(p => p.Difficulty == difficulty);
+        if (!string.IsNullOrWhiteSpace(category)) q = q.Where(p => p.Category == category);
+        if (!string.IsNullOrWhiteSpace(language)) q = q.Where(p => p.StarterCodes.Any(s => s.Language == language));
         if (courseId.HasValue) q = q.Where(p => p.CourseId == courseId);
         if (classId.HasValue) q = q.Where(p => p.ClassId == classId);
         return Result<object>.Success(new { Items = await q.OrderByDescending(p => p.CreatedAt).Skip((Math.Clamp(page, 1, 100000) - 1) * 20).Take(20)
-            .Select(p => new { p.Id, p.Title, p.Difficulty, p.Points, Status = p.Status.ToString(), p.CourseId, p.ClassId }).ToListAsync(ct), Total = await q.CountAsync(ct) });
+            .Select(p => new { p.Id, p.Title, p.Category, p.Difficulty, p.Points, Status = p.Status.ToString(), p.CourseId, p.ClassId }).ToListAsync(ct), Total = await q.CountAsync(ct) });
     }
     public async Task<Result<object>> SaveProblem(Guid? id, ProblemWrite r, Actor a, CancellationToken ct)
     {
@@ -57,7 +63,7 @@ public sealed class JudgeService(JudgeDbContext db, IJudgeAccess access, ICodeEx
         p.Title = r.Title.Trim();
         // Raw HTML is encoded at the boundary. Frontend additionally skips HTML and filters URLs.
         p.Description = r.Description.Replace("<", "&lt;").Replace(">", "&gt;");
-        p.Difficulty = r.Difficulty; p.TimeLimitMs = r.TimeLimitMs; p.MemoryLimitMb = r.MemoryLimitMb;
+        p.Category = r.Category; p.Difficulty = r.Difficulty; p.TimeLimitMs = r.TimeLimitMs; p.MemoryLimitMb = r.MemoryLimitMb;
         p.Points = r.Points; p.CourseId = r.CourseId; p.ClassId = r.ClassId; p.ComparisonMode = r.ComparisonMode;
         foreach (var old in p.StarterCodes.Where(s => !r.StarterCodes.Any(n => n.Language == s.Language)).ToArray()) { p.StarterCodes.Remove(old); db.Remove(old); }
         foreach (var starter in r.StarterCodes)

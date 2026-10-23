@@ -1,11 +1,12 @@
+import { AppSidebar } from '../../home/AppSidebar';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, ChevronDown, LogOut, PanelLeft, Search, Settings, Moon, Sun } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useLogout } from '../../auth/hooks/useAuth';
 import { adminNavigation } from './AdminSidebar';
-interface Props { onToggleSidebar: () => void; isSidebarCollapsed: boolean; isMobileSidebarOpen: boolean; theme: 'light' | 'dark'; onToggleTheme: () => void }
-export function AdminHeader({ onToggleSidebar, isSidebarCollapsed, isMobileSidebarOpen, theme, onToggleTheme }: Props) {
+interface Props { onToggleSidebar: () => void; isMobileSidebarOpen: boolean; theme: 'light' | 'dark'; onToggleTheme: () => void }
+export function AdminHeader({ onToggleSidebar, isMobileSidebarOpen, theme, onToggleTheme }: Props) {
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
   const [panel, setPanel] = useState<'search' | 'notifications' | 'profile' | 'settings' | null>(null);
@@ -32,11 +33,14 @@ export function AdminHeader({ onToggleSidebar, isSidebarCollapsed, isMobileSideb
     document.addEventListener('keydown', keyboard);
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', keyboard); };
   }, [panel]);
-  return <header ref={headerRef} className="sticky top-0 z-30 flex h-15 items-center gap-2 border-b border-[#e8e8eb] bg-white px-3 sm:gap-[15px] sm:px-5" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPanel(null); }}>
-    <button type="button" className="hidden lg:inline-flex size-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-zinc-600 hover:bg-[#f1f1f3]" onClick={onToggleSidebar} aria-label={isSidebarCollapsed ? 'Mở rộng sidebar' : 'Thu gọn sidebar'} aria-controls="admin-desktop-sidebar" aria-expanded={!isSidebarCollapsed}><PanelLeft size={18} /></button>
-    <button type="button" className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-zinc-600 hover:bg-[#f1f1f3] lg:hidden" onClick={onToggleSidebar} aria-label="Mở menu quản trị" aria-controls="admin-mobile-sidebar" aria-expanded={isMobileSidebarOpen}><PanelLeft size={18} /></button>
-    <span className="hidden h-[19px] w-px shrink-0 bg-[#e8e8eb] sm:block" />
-    <div className="relative flex h-[35px] min-w-0 flex-1 items-center rounded-md border border-[#dedee3] text-[#808087] shadow-[0_1px_2px_#00000005] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-400 sm:max-w-96">
+  return <header ref={headerRef} className="sticky top-0 z-30 flex min-h-14 flex-wrap items-center py-1 sm:h-14 sm:flex-nowrap gap-2 border-b border-[#e8e8eb] bg-white px-3 sm:gap-[15px] sm:px-5 lg:gap-6" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPanel(null); }}>
+    <div className="flex shrink-0 items-center gap-3 lg:w-[236px]">
+      <AppSidebar />
+    <Link to="/admin/dashboard" className="inline-flex h-11 shrink-0 items-center text-[22px] font-bold leading-none tracking-[-0.7px] text-neutral-900" aria-label="CodePart — Tổng quan">CodePart</Link>
+    </div>
+
+    <button type="button" className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100 lg:hidden" onClick={onToggleSidebar} aria-label="Mở sidebar quản trị" aria-controls="admin-mobile-sidebar" aria-expanded={isMobileSidebarOpen}><PanelLeft size={18} /></button>
+    <div className="relative flex h-[35px] min-w-0 flex-1 items-center rounded-md border border-[#dedee3] text-[#808087] shadow-[0_1px_2px_#00000005] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-zinc-400 sm:max-w-96 max-sm:order-last max-sm:basis-full max-sm:grow-0">
       <input className="w-full min-w-0 border-0 bg-transparent px-2.5 py-2 text-xs text-neutral-800 focus-visible:outline-none" ref={searchRef} value={query} onFocus={() => setPanel('search')} onChange={(event) => { setQuery(event.target.value); setPanel('search'); }} placeholder="Tìm chức năng..." aria-label="Tìm chức năng quản trị" aria-controls="admin-search-results" aria-expanded={panel === 'search'} />
       <button type="button" className="mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-zinc-100" aria-label="Tìm kiếm" onClick={() => { searchRef.current?.focus(); setPanel('search'); }}><Search size={17} /></button>
       {panel === 'search' && <div id="admin-search-results" className="absolute top-[calc(100%+12px)] z-40 rounded-[10px] border border-zinc-200 bg-white text-neutral-800 shadow-[0_10px_30px_#00000012] left-0 w-[max(100%,240px)] max-w-[calc(100vw-100px)] p-[7px]"><p className="m-0 px-[9px] py-1.5 text-[10px] tracking-[.06em] text-[#85858c]">ĐIỀU HƯỚNG NHANH</p>{results.map(({ label, to, icon: Icon }) => <Link className="flex w-full items-center gap-2.5 rounded-[5px] border-0 bg-transparent px-[9px] py-[11px] text-left text-xs text-neutral-700 no-underline hover:bg-zinc-100" key={to} to={to} onClick={() => { setPanel(null); setQuery(''); }}><Icon size={17} />{label}</Link>)}{!results.length && <p className="m-0 p-2 text-xs leading-[1.7] text-neutral-500">Không tìm thấy chức năng phù hợp.</p>}</div>}
@@ -51,7 +55,6 @@ export function AdminHeader({ onToggleSidebar, isSidebarCollapsed, isMobileSideb
         <button ref={bellRef} type="button" className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-zinc-600 hover:bg-[#f1f1f3]" aria-label="Thông báo" aria-expanded={panel === 'notifications'} aria-controls="admin-notifications" onClick={() => setPanel(panel === 'notifications' ? null : 'notifications')}><Bell size={18} /></button>
         {panel === 'notifications' && <div id="admin-notifications" className="absolute top-[calc(100%+12px)] z-40 rounded-[10px] border border-zinc-200 bg-white text-neutral-800 shadow-[0_10px_30px_#00000012] -right-[43px] w-[270px] max-w-[calc(100vw-32px)] p-[17px] sm:right-0"><strong>Thông báo</strong><p className="m-0 p-2 text-xs leading-[1.7] text-neutral-500">Thông báo hệ thống chưa được kết nối.</p></div>}
       </div>
-      <span className="hidden h-[19px] w-px shrink-0 bg-[#e8e8eb] sm:block" />
       <div className="relative">
         <button ref={profileRef} type="button" className="flex items-center gap-[7px] rounded-[7px] border-0 bg-transparent p-[3px] text-neutral-500 hover:bg-[#f1f1f3] [&>svg]:hidden sm:[&>svg]:block" aria-label="Tài khoản quản trị" aria-expanded={panel === 'profile'} aria-controls="admin-profile" onClick={() => setPanel(panel === 'profile' ? null : 'profile')}><span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#e8e3db] text-xs font-bold text-[#655947]">{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</span><span className="hidden max-w-24 truncate text-xs font-medium text-neutral-700 sm:block xl:max-w-40">{user?.fullName || user?.email || 'Tài khoản'}</span><ChevronDown size={14} /></button>
         {panel === 'profile' && <div id="admin-profile" className="absolute top-[calc(100%+12px)] z-40 rounded-[10px] border border-zinc-200 bg-white text-neutral-800 shadow-[0_10px_30px_#00000012] right-0 w-[270px] max-w-[calc(100vw-32px)] p-[7px]"><div className="mb-[5px] flex flex-col gap-[5px] border-b border-[#ededed] p-2.5 [overflow-wrap:anywhere] [&_span]:text-xs [&_span]:text-neutral-500 [&_small]:text-xs [&_small]:text-neutral-500"><strong>{user?.fullName || 'Quản trị viên'}</strong><span>{user?.email}</span><small>Quản trị viên</small></div><button type="button" className="flex w-full items-center gap-2.5 rounded-[5px] border-0 bg-transparent px-[9px] py-[11px] text-left text-xs text-neutral-700 no-underline hover:bg-zinc-100" onClick={() => logout.mutate()} disabled={logout.isPending}><LogOut size={16} />{logout.isPending ? 'Đang đăng xuất...' : 'Đăng xuất'}</button></div>}

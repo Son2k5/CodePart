@@ -25,11 +25,11 @@ export function RagSources({ sources, label = 'Nguồn tham khảo' }: { sources
     finally { setBusy(false); }
   }
   if (!sources.length) return null;
-  return <section className="rag-sources"><h3>{label}</h3><ul>{sources.map(s => <li key={s.chunkId}>
-    <button type="button" disabled={busy} onClick={() => void open(s)}>{s.title}{s.page ? ` · trang ${s.page}` : s.heading ? ` · ${s.heading}` : ''}</button>
-  </li>)}</ul>{error && <p role="alert">{error}</p>}
-    {source && <div className="rag-source"><button type="button" onClick={() => setSource(undefined)}>Đóng nguồn</button><h4>{source.title}</h4>
-      {source.url ? <a href={source.url} target="_blank" rel="noopener noreferrer">Mở tài liệu PDF</a> : <Markdown skipHtml rehypePlugins={[rehypeSanitize]}>{source.text}</Markdown>}
+  return <section className="mt-4 [&_ul]:list-none [&_ul]:p-0 [&_li]:my-2"><h3 className="text-sm font-semibold my-2">{label}</h3><ul className="list-none p-0">{sources.map(s => <li key={s.chunkId} className="my-2">
+    <button type="button" disabled={busy} onClick={() => void open(s)} className="border border-[#c7d3df] rounded-lg px-3 py-2 bg-[#f3f7fb] text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#e9f0f8]">{s.title}{s.page ? ` · trang ${s.page}` : s.heading ? ` · ${s.heading}` : ''}</button>
+  </li>)}</ul>{error && <p role="alert" className="text-[#a32222] text-sm my-2">{error}</p>}
+    {source && <div className="p-[18px] border border-[#d3deeb] rounded-xl mt-4 max-h-[500px] overflow-auto bg-white"><button type="button" onClick={() => setSource(undefined)} className="border border-[#c7d3df] rounded-lg px-3 py-2 bg-[#f3f7fb] text-sm cursor-pointer hover:bg-[#e9f0f8] mb-3">Đóng nguồn</button><h4 className="font-semibold text-base mb-2">{source.title}</h4>
+      {source.url ? <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-[#175cb8] underline text-sm">Mở tài liệu PDF</a> : <Markdown skipHtml rehypePlugins={[rehypeSanitize]}>{source.text}</Markdown>}
     </div>}
   </section>;
 }

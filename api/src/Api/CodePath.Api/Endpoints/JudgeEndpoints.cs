@@ -11,7 +11,7 @@ public static class JudgeEndpoints
     public static void MapJudgeEndpoints(this IEndpointRouteBuilder app)
     {
         var student = app.MapGroup("/api/problems").WithTags("Code Judge").RequireAuthorization("ActiveStudent");
-        student.MapGet("/", async (HttpContext c, IJudgeService s, CancellationToken ct, int page = 1, Guid? courseId = null, Guid? classId = null) => (await s.ListProblems(Actor(c), false, page, ct, courseId, classId)).ToHttpResult())
+        student.MapGet("/", async (HttpContext c, IJudgeService s, CancellationToken ct, int page = 1, Guid? courseId = null, Guid? classId = null, bool library = false, string? search = null, string? difficulty = null, string? category = null, string? language = null) => (await s.ListProblems(Actor(c), false, page, ct, courseId, classId, library, search, difficulty, category, language)).ToHttpResult())
             .WithMetadata(new SkipActivityTrackingAttribute());
         student.MapGet("/scopes", async (HttpContext c, IJudgeAccess s, CancellationToken ct) => Results.Ok(await s.Scopes(Actor(c), false, ct)));
         student.MapGet("/{id:guid}", async (Guid id, HttpContext c, IJudgeService s, CancellationToken ct) => (await s.GetProblem(id, Actor(c), false, ct)).ToHttpResult());

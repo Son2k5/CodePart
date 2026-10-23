@@ -9,6 +9,7 @@ public sealed class Problem
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Title { get; set; } = "";
     public string Description { get; set; } = "";
+    public string Category { get; set; } = "general";
     public string Difficulty { get; set; } = "Easy";
     public int TimeLimitMs { get; set; } = 2000;
     public int MemoryLimitMb { get; set; } = 256;

@@ -24,6 +24,7 @@ public sealed class JudgeDbContext(DbContextOptions<JudgeDbContext> options) : D
         p.ToTable("judge_problems"); p.HasKey(x => x.Id); p.Ignore(x => x.CanPublish);
         p.HasQueryFilter(x => !x.IsDeleted);
         p.Property(x => x.Title).HasMaxLength(250);
+        p.Property(x => x.Category).HasMaxLength(40).HasDefaultValue("general");
         p.HasMany(x => x.TestCases).WithOne().HasForeignKey(x => x.ProblemId).OnDelete(DeleteBehavior.Cascade);
         p.HasMany(x => x.StarterCodes).WithOne().HasForeignKey(x => x.ProblemId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<ProblemStarterCode>().ToTable("judge_starters").HasKey(x => new { x.ProblemId, x.Language });

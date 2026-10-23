@@ -55,11 +55,13 @@ public class JudgeRulesTests
         p.TestCases[2].IsSample = true; Assert.False(p.CanPublish);
         p.TestCases.RemoveAt(0); Assert.False(p.CanPublish);
     }
-    [Fact] public void New_problem_must_belong_to_exactly_one_class_or_course()
+    [Fact] public void New_problem_can_be_public_or_belong_to_one_class_or_course()
     {
         var validator = new ProblemWriteValidator();
         var request = new ProblemWrite("Sum", "Description", "Easy", 1000, 64, 100, null, ComparisonMode.Lines, [new("python", "print(1)")]);
-        Assert.False(validator.Validate(request).IsValid);
+        Assert.True(validator.Validate(request).IsValid);
+        Assert.False(validator.Validate(request with { Category = "invalid" }).IsValid);
+        Assert.True(validator.Validate(request with { Category = "arrays" }).IsValid);
         Assert.True(validator.Validate(request with { ClassId = Guid.NewGuid() }).IsValid);
         Assert.True(validator.Validate(request with { CourseId = Guid.NewGuid() }).IsValid);
         Assert.False(validator.Validate(request with { ClassId = Guid.NewGuid(), CourseId = Guid.NewGuid() }).IsValid);
