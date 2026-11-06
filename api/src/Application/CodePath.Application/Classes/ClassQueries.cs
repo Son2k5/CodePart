@@ -6,6 +6,7 @@ namespace CodePath.Application.Classes;
 
 public sealed record ListClassesQuery(ClassFilter Filter) : IRequest<Result<ClassPage<ClassDto>>>;
 public sealed record PublicClassesQuery(ClassFilter Filter, Guid Student) : IRequest<Result<ClassPage<PublicClassDto>>>;
+public sealed record StudentClassInfoQuery(Guid ClassId, Guid Student) : IRequest<Result<StudentClassInfoDto>>;
 public sealed record ClassDetailQuery(Guid Id) : IRequest<Result<ClassDto>>;
 public sealed record ClassStudentsQuery(Guid Id, ClassFilter Filter) : IRequest<Result<ClassPage<ClassStudentDto>>>;
 public sealed class ClassFilterValidator : AbstractValidator<ClassFilter>
@@ -23,11 +24,14 @@ public sealed class ListClassesValidator : AbstractValidator<ListClassesQuery>
 { public ListClassesValidator() => RuleFor(x => x.Filter).SetValidator(new ClassFilterValidator()); }
 public sealed class PublicClassesValidator : AbstractValidator<PublicClassesQuery>
 { public PublicClassesValidator() => RuleFor(x => x.Filter).SetValidator(new ClassFilterValidator()); }
+public sealed class StudentClassInfoValidator : AbstractValidator<StudentClassInfoQuery>
+{ public StudentClassInfoValidator() { RuleFor(x => x.ClassId).NotEmpty(); RuleFor(x => x.Student).NotEmpty(); } }
 public sealed class ClassStudentsValidator : AbstractValidator<ClassStudentsQuery>
 { public ClassStudentsValidator() => RuleFor(x => x.Filter).SetValidator(new ClassFilterValidator()); }
 public sealed class ClassQueryHandlers(IClassRepository db) :
     IRequestHandler<ListClassesQuery, Result<ClassPage<ClassDto>>>,
     IRequestHandler<PublicClassesQuery, Result<ClassPage<PublicClassDto>>>,
+    IRequestHandler<StudentClassInfoQuery, Result<StudentClassInfoDto>>,
     IRequestHandler<ClassDetailQuery, Result<ClassDto>>,
     IRequestHandler<ClassStudentsQuery, Result<ClassPage<ClassStudentDto>>>
 {
@@ -35,6 +39,10 @@ public sealed class ClassQueryHandlers(IClassRepository db) :
         Result<ClassPage<ClassDto>>.Success(await db.ListAsync(r.Filter, ct));
     public async Task<Result<ClassPage<PublicClassDto>>> Handle(PublicClassesQuery r, CancellationToken ct) =>
         Result<ClassPage<PublicClassDto>>.Success(await db.PublicAsync(r.Filter, r.Student, ct));
+    public async Task<Result<StudentClassInfoDto>> Handle(StudentClassInfoQuery r, CancellationToken ct) =>
+        await db.StudentInfoAsync(r.ClassId, r.Student, ct) is { } c
+            ? Result<StudentClassInfoDto>.Success(c)
+            : Result<StudentClassInfoDto>.Failure("Không tìm thấy lớp học hoặc lớp không khả dụng.", "CLASS_NOT_FOUND");
     public async Task<Result<ClassDto>> Handle(ClassDetailQuery r, CancellationToken ct) =>
         await db.DetailAsync(r.Id, ct) is { } c ? Result<ClassDto>.Success(c) : Result<ClassDto>.Failure("Không tìm thấy lớp.", "CLASS_NOT_FOUND");
     public async Task<Result<ClassPage<ClassStudentDto>>> Handle(ClassStudentsQuery r, CancellationToken ct) =>

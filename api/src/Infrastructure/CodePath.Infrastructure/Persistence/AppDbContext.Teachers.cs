@@ -2,7 +2,6 @@ using System.Linq.Expressions;
 using CodePath.Application.Admin.Abstractions;
 using CodePath.Application.Admin.Dtos;
 using CodePath.Domain.Users.Entities;
-using CodePath.Domain.Users.Enums;
 using CodePath.Shared.Kernel.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +12,7 @@ public partial class AppDbContext
     private Expression<Func<User, TeacherDto>> TeacherProjection => u => new(
         u.Id, u.TeacherId, u.FullName, u.Email, u.PhoneNumber, u.Bio, u.FacultyId,
         u.Faculty == null ? null : u.Faculty.Name, u.Status.ToString(),
-        ClassTeachers.Count(t => t.TeacherId == u.Id), u.TeachingCourses.Count, u.EmailVerifiedAt, u.CreatedAt, u.LastLoginAt);
+        ClassTeachers.Count(t => t.TeacherId == u.Id), u.EmailVerifiedAt, u.CreatedAt, u.LastLoginAt);
 
     async Task<OffsetPage<TeacherDto>> IAdminDbContext.GetPagedTeachersAsync(TeacherFilter filter, CancellationToken ct)
     {
@@ -55,10 +54,7 @@ public partial class AppDbContext
         if (profile is null) return null;
         var classes = await Classes.AsNoTracking().Where(c => c.Teachers.Any(t => t.TeacherId == id)).OrderBy(c => c.Name)
             .Select(c => new ManagedClassDto(c.Id, c.Name, c.AcademicYear, c.ClassEnrollments.Count(e => e.Status == ClassEnrollmentStatus.Active))).ToListAsync(ct);
-        var courses = await Courses.AsNoTracking().Where(c => c.TeacherId == id).OrderBy(c => c.SectionCode)
-            .Select(c => new TeachingCourseDto(c.Id, c.SubjectName, c.SectionCode, c.Semester, c.MaxCapacity,
-                c.Enrollments.Count(e => e.Status == EnrollmentStatus.Active))).ToListAsync(ct);
-        return new(profile, classes, courses);
+        return new(profile, classes);
     }
 
     async Task<IReadOnlyList<FacultyDto>> IAdminDbContext.GetFacultiesAsync(CancellationToken ct) =>

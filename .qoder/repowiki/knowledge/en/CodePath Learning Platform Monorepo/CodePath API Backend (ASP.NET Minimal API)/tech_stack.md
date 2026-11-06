@@ -1,0 +1,1 @@
+ASP.NET Core minimal APIs, EF Core with Pomelo.MySql against MySQL 8.4+, Redis for distributed state (login attempts, OTP, token blacklist, session activity), BCrypt for passwords, HmacSha256 JWT signing, FluentValidation + MediatR for request pipeline, SignalR for AI assistant streaming, Judge0 for code execution, Cloudinary for learning assets, Python RAG client.

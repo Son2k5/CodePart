@@ -42,8 +42,8 @@ public static partial class AdminEndpoints
             var d = result.Value!;
             var p = d.Profile;
             return Results.Ok(new { p.Id, p.StudentId, p.FullName, p.Email, p.Phone, p.Bio,
-                p.FacultyId, p.FacultyName, p.Status, p.ClassesCount, p.CoursesCount,
-                p.EmailVerifiedAt, p.CreatedAt, p.LastLoginAt, d.EnrolledClasses, d.EnrolledCourses });
+                p.FacultyId, p.FacultyName, p.Status, p.ClassesCount,
+                p.EmailVerifiedAt, p.CreatedAt, p.LastLoginAt, d.EnrolledClasses });
         });
 
         group.MapPost("/students", async (CreateStudentInput body, HttpContext ctx, ISender sender, CancellationToken ct) =>

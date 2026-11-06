@@ -1,7 +1,7 @@
 import type { Problem, Submission, TestResult } from '../../code-judge/api';
 export const demoProblem: Problem = {
-  id: 'demo-sum', title: 'Tổng hai số', difficulty: 'Easy', points: 100,
-  timeLimitMs: 1000, memoryLimitMb: 128, classId: 'demo-class', courseId: null, status: 'Published', comparisonMode: 0,
+  id: 'demo-sum', category: 'basics', title: 'Tổng hai số', difficulty: 'Easy', points: 100,
+  timeLimitMs: 1000, memoryLimitMb: 128, classId: 'demo-class', status: 'Published', comparisonMode: 0,
   description: '## Cùng bắt đầu thật nhẹ nhàng\n\nMầm có hai giỏ táo, giỏ thứ nhất có **a** quả và giỏ thứ hai có **b** quả. Bạn hãy giúp Mầm tính tổng số táo nhé!\n\nCho hai số nguyên `a` và `b`. Viết chương trình tính và in ra tổng của chúng.\n\n### Dữ liệu vào\nMột dòng chứa hai số nguyên `a` và `b`, cách nhau bởi một dấu cách.\n\n### Dữ liệu ra\nIn ra một số nguyên duy nhất — tổng của `a` và `b`.\n\n### Giới hạn\n- `−10⁹ ≤ a, b ≤ 10⁹`\n- Đừng quên thử với số âm và số 0 nhé.',
   starterCodes: [
     { language: 'python', template: '# Cùng giúp Mầm đếm táo nhé! 🌱\n# Đọc hai số nguyên từ bàn phím\na, b = map(int, input().split())\n\n# Viết lời giải của bạn ở đây\n\n' },

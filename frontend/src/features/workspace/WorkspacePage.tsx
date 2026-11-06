@@ -28,7 +28,7 @@ export function WorkspacePage() {
   const params = useParams(); const id = params.problemId ?? params.id ?? '';
   const query = useQuery({ queryKey: ['judge-problem', id], queryFn: () => judgeApi.problem(id) });
   if (query.isPending) return <main className="workspace ws-page"><Loading /></main>;
-  if (query.isError) return <main className="workspace ws-page"><Empty title="Chưa mở được bài tập">Kiểm tra kết nối hoặc quyền truy cập lớp học.</Empty><div className="ws-center"><button onClick={() => void query.refetch()}>Thử lại</button><Link to="/problems">Về danh sách bài</Link></div></main>;
+  if (query.isError) return <main className="workspace ws-page"><Empty title="Chưa mở được bài tập">Kiểm tra kết nối hoặc quyền truy cập bài tập.</Empty><div className="ws-center"><button onClick={() => void query.refetch()}>Thử lại</button><Link to="/practice">Về danh sách bài</Link></div></main>;
   return <PanelBoundary key={id}><Workspace problem={query.data} /></PanelBoundary>;
 }
 
@@ -73,15 +73,15 @@ function Workspace({ problem: p }: { problem: Problem }) {
   const horizontal = useDefaultLayout({ id: 'codepath:workspace:horizontal', storage: safeLayoutStorage, onlySaveAfterUserInteractions: true });
   const vertical = useDefaultLayout({ id: 'codepath:workspace:vertical', storage: safeLayoutStorage, onlySaveAfterUserInteractions: true });
   const cache = useQueryClient(); const scope = problemScope(p);
-  const scopes = useQuery({ queryKey: ['judge-scopes'], queryFn: () => judgeApi.scopes() });
-  const peers = useQuery({ queryKey: ['judge-list', 1, scope], queryFn: () => judgeApi.list(false, 1, scope) });
+  const scopes = useQuery({ queryKey: ['judge-scopes'], enabled: !!scope, queryFn: () => judgeApi.scopes() });
+  const peers = useQuery({ queryKey: ['judge-list', 1, scope], queryFn: () => scope ? judgeApi.list(false, 1, scope) : judgeApi.library({ page: 1, search: '', category: '', difficulty: '', language: '' }) });
   const topic = useQuery({ queryKey: ['workspace-topic', classId, slug], enabled: !!classId && !!slug, queryFn: async () => (await axiosInstance.get<TopicContext>(`/classes/${classId}/topics/${slug}`)).data });
   const history = useQuery({ queryKey: ['judge-history', p.id, historyPage], queryFn: () => judgeApi.history(p.id, historyPage) });
   const status = useSubmissionStatus(submissionId); const s = status.data;
   const className = scopes.data?.find(value => `${value.kind}:${value.id}` === scope)?.name ?? 'Góc luyện tập';
   const siblings = classId && slug ? topic.data?.exercises.map(e => e.problemId) ?? [] : peers.data?.items.map(item => item.id) ?? [];
   const position = siblings.indexOf(p.id);
-  const problemPath = (id: string) => classId && slug ? `/classes/${classId}/topics/${slug}/problems/${id}` : `/problems/${id}`;
+  const problemPath = (id: string) => classId && slug ? `/classes/${classId}/topics/${slug}/problems/${id}` : `/practice/${id}`;
   const samples = p.testCases.filter(t => t.isSample);
   const sample = samples[selectedSample];
   const revealResults = () => { setConsoleTab('result'); setMobileTab('result'); setCollapsed(false); consolePanel.current?.expand(); };
@@ -139,8 +139,8 @@ function Workspace({ problem: p }: { problem: Problem }) {
   </div>;
   return <main className={`workspace ws-page ${fullscreen ? 'ws-focus-mode' : ''}`}>
     {import.meta.env.DEV && import.meta.env.VITE_USE_MOCK === 'true' && <Suspense><MockControls /></Suspense>}
-    <header className="ws-topbar"><Link to="/" className="ws-brand"><span><Code2 size={23} /></span>CodePath<span className="ws-brand-dot">.</span></Link><div className="ws-breadcrumb"><Link to="/problems">{className}</Link><ChevronRight size={13} />{topic.data && <><span>{topic.data.title}</span><ChevronRight size={13} /></>}<strong>{p.title}</strong></div><div className="ws-top-actions">{executionActions}</div><span className="ws-avatar" title={user?.fullName}>{user?.fullName?.split(' ').at(-1)?.[0] ?? 'B'}</span></header>
-    <div className="ws-welcome"><div><Link to="/problems" className="ws-back"><ArrowLeft size={14} /> Danh sách bài tập</Link><h1>Mỗi dòng code, một bước tiến<span> 🌱</span></h1><p>Cứ thử, cứ sai, rồi bạn sẽ làm được.</p></div><div className="ws-welcome-right"><span className="ws-points"><Trophy size={16} /> {p.points} điểm</span>{topic.data?.dueAt && <span className={`ws-badge ${Date.parse(topic.data.dueAt) < Date.now() ? 'is-fail' : 'is-wait'}`}>Hạn: {new Date(topic.data.dueAt).toLocaleString('vi-VN')}</span>}<Mascot size={76} /></div></div>
+    <header className="ws-topbar"><Link to="/" className="ws-brand"><span><Code2 size={23} /></span>CodePath<span className="ws-brand-dot">.</span></Link><div className="ws-breadcrumb"><Link to="/practice">{className}</Link><ChevronRight size={13} />{topic.data && <><span>{topic.data.title}</span><ChevronRight size={13} /></>}<strong>{p.title}</strong></div><div className="ws-top-actions">{executionActions}</div><span className="ws-avatar" title={user?.fullName}>{user?.fullName?.split(' ').at(-1)?.[0] ?? 'B'}</span></header>
+    <div className="ws-welcome"><div><Link to="/practice" className="ws-back"><ArrowLeft size={14} /> Danh sách bài tập</Link><h1>Mỗi dòng code, một bước tiến<span> 🌱</span></h1><p>Cứ thử, cứ sai, rồi bạn sẽ làm được.</p></div><div className="ws-welcome-right"><span className="ws-points"><Trophy size={16} /> {p.points} điểm</span>{topic.data?.dueAt && <span className={`ws-badge ${Date.parse(topic.data.dueAt) < Date.now() ? 'is-fail' : 'is-wait'}`}>Hạn: {new Date(topic.data.dueAt).toLocaleString('vi-VN')}</span>}<Mascot size={76} /></div></div>
     {topic.isError && <div className="ws-inline-error">Chưa tải được ngữ cảnh bài học.<button onClick={() => void topic.refetch()}>Thử lại</button></div>}
     <Group orientation="horizontal" className="ws-layout" {...horizontal}>
       <Panel id="problem" defaultSize="42%" minSize="28%" className={`ws-card ws-problem ${mobileTab === 'description' ? 'ws-mobile-active' : ''}`}>

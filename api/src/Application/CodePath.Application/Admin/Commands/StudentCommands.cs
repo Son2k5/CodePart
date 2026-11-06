@@ -6,7 +6,6 @@ using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auditing.Entities;
 using CodePath.Domain.Auditing.Enums;
 using CodePath.Domain.Users.Entities;
-using CodePath.Domain.Users.Enums;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using FluentValidation;

@@ -1,5 +1,6 @@
 using CodePath.Application.Judge;
 using CodePath.Application.Learning;
+using CodePath.Application.Notifications.Abstractions;
 using CodePath.Domain.Common.Exceptions;
 using CodePath.Domain.Learning;
 using CodePath.Domain.Users.Entities;
@@ -43,7 +44,7 @@ public sealed class RagAccessTests
         db.Classes.Add(c); db.Chapters.Add(ch); db.Topics.Add(topic);
         db.ClassEnrollments.Add(ClassEnrollment.Create(reason == "other-class" ? Guid.NewGuid() : c.Id, student, ClassJoinMethod.Public, now));
         await db.SaveChangesAsync();
-        var service = new LearningService(db, judge, TimeProvider.System, Mock.Of<IConnectionMultiplexer>(), Mock.Of<IPublisher>(), new ContentValidator(db, new ConfigurationBuilder().Build()));
+        var service = new LearningService(db, judge, TimeProvider.System, Mock.Of<IConnectionMultiplexer>(), Mock.Of<IPublisher>(), new ContentValidator(db, new ConfigurationBuilder().Build()), Mock.Of<IEventBus>());
         await Assert.ThrowsAsync<DomainRuleViolationException>(() => service.RagTopic(topic.Id, new(student, false, false), false, default));
     }
 
@@ -58,7 +59,7 @@ public sealed class RagAccessTests
         c.Teachers.Add(ClassTeacher.Create(c.Id, teacher, teacher, now));
         var chapter = new Chapter { ClassId = c.Id }; var topic = new Topic { ClassId = c.Id, ChapterId = chapter.Id }; topic.Publish(now);
         db.Classes.Add(c); db.Chapters.Add(chapter); db.Topics.Add(topic); await db.SaveChangesAsync();
-        var service = new LearningService(db, judge, TimeProvider.System, Mock.Of<IConnectionMultiplexer>(), Mock.Of<IPublisher>(), new ContentValidator(db, new ConfigurationBuilder().Build()));
+        var service = new LearningService(db, judge, TimeProvider.System, Mock.Of<IConnectionMultiplexer>(), Mock.Of<IPublisher>(), new ContentValidator(db, new ConfigurationBuilder().Build()), Mock.Of<IEventBus>());
         Assert.Equal(topic.Id, (await service.RagTopic(topic.Id, new(teacher, false, true), true, default)).Id);
         await using (var other = new AppDbContext(options))
         {

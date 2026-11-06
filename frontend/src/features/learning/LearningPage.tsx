@@ -131,7 +131,7 @@ function TopicReader({ classId, topic }: { classId: string; topic: Topic }) {
   const data = query.data;
   return <article><h2>{data.title}</h2>{data.content.map(b => <section key={b.blockId}>
     {b.type === 'Markdown' ? <Markdown skipHtml rehypePlugins={[rehypeSanitize]}>{b.data.markdown}</Markdown> : b.type === 'Pdf' ? <RagSources sources={[{ chunkId: b.blockId, documentId: b.data.assetId!, blockId: b.blockId, topicId: data.id, classId, version: data.publishedVersion, title: b.data.title ?? 'Tài liệu', heading: '' }]} /> : b.type === 'Video' && b.data.url ? <a href={b.data.url} target="_blank" rel="noopener noreferrer">Xem video bài học</a> : null}
-  </section>)}{data.exercises.length > 0 && <section><h3>Bài tập</h3>{data.exercises.map((e, i) => <p key={e.problemId}><Link to={`/problems/${e.problemId}`}>Bài tập {i + 1}</Link> · {e.status}</p>)}</section>}<TopicAssistant topicId={data.id} /></article>;
+  </section>)}{data.exercises.length > 0 && <section><h3>Bài tập</h3>{data.exercises.map((e, i) => <p key={e.problemId}><Link to={`/practice/${e.problemId}`}>Bài tập {i + 1}</Link> · {e.status}</p>)}</section>}<TopicAssistant topicId={data.id} /></article>;
 }
 
 function TopicAssistant({ topicId }: { topicId: string }) {

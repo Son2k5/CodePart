@@ -93,6 +93,17 @@ public partial class AppDbContext : IClassRepository
             c.StartDate, c.EndDate, c.ClassEnrollments.Any(e => e.StudentId == student && e.Status == ClassEnrollmentStatus.Active))).ToListAsync(ct);
         return new(items, f.Page, f.PageSize, count);
     }
+    async Task<StudentClassInfoDto?> IClassRepository.StudentInfoAsync(Guid id, Guid student, CancellationToken ct) =>
+        await Classes.AsNoTracking()
+            .Where(c => c.Id == id && !c.IsTemplate &&
+                        (c.Status == ClassStatus.Active && c.AccessType == ClassAccessType.Public ||
+                         c.ClassEnrollments.Any(e => e.StudentId == student && e.Status == ClassEnrollmentStatus.Active)))
+            .Select(c => new StudentClassInfoDto(
+                c.Id, c.Name, c.Description, c.Thumbnail, c.Status.ToString(), c.AccessType.ToString(), c.MaxStudents,
+                c.ClassEnrollments.Count(e => e.Status == ClassEnrollmentStatus.Active), c.StartDate, c.EndDate,
+                c.ClassEnrollments.Any(e => e.StudentId == student && e.Status == ClassEnrollmentStatus.Active),
+                c.Teachers.OrderBy(t => t.Teacher.FullName)
+                    .Select(t => new ClassTeacherInfoDto(t.Teacher.FullName, t.Teacher.AvatarUrl)).ToList())).SingleOrDefaultAsync(ct);
     async Task<ClassPage<ClassStudentDto>> IClassRepository.StudentsAsync(Guid id, ClassFilter f, CancellationToken ct)
     {
         var q = ClassEnrollments.AsNoTracking().Where(e => e.ClassId == id && e.Status == ClassEnrollmentStatus.Active);

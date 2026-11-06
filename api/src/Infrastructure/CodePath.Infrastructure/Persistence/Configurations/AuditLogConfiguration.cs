@@ -10,6 +10,8 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
     public void Configure(EntityTypeBuilder<AuditLog> builder)
     {
         builder.ToTable("audit_logs");
+        builder.Property(x => x.OldValue).HasColumnType("json");
+        builder.Property(x => x.NewValue).HasColumnType("json");
 
         builder.HasKey(log => log.Id);
         builder.Property(log => log.Id).ValueGeneratedNever();

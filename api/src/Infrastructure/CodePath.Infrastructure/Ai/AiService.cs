@@ -26,7 +26,7 @@ public sealed class AiService(JudgeDbContext db, IJudgeAccess access, IAiAssista
             throw new AiPolicyException("INVALID_CONTEXT");
         var p = await db.Problems.AsNoTracking().Include(x => x.StarterCodes).SingleOrDefaultAsync(x => x.Id == input.ProblemId, ct);
         if (p == null || p.Status != ProblemStatus.Published ||
-            !((p.ClassId.HasValue || p.CourseId.HasValue) && await access.CanAccess(p.CourseId, p.ClassId, new(studentId, false, false), false, ct)
+            !(p.ClassId.HasValue && await access.CanAccess(p.ClassId, new(studentId, false, false), false, ct)
                 || await learning.CanReadLinkedProblem(p.Id, new(studentId, false, false), ct)))
             throw new AiPolicyException("FORBIDDEN", 403);
         var starter = p.StarterCodes.SingleOrDefault(x => x.Language == input.Language);

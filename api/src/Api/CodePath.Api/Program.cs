@@ -10,6 +10,7 @@ using CodePath.Api.Options;
 using CodePath.Api.Middleware;
 using CodePath.Application;
 using CodePath.Application.Auth.Abstractions;
+using CodePath.Application.Notifications.Abstractions;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
@@ -88,6 +89,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            // SignalR WebSocket handshakes cannot set an Authorization header, so browsers pass
+            // the JWT via the access_token query string on hub paths.
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    context.Token = accessToken;
+
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var blacklistService = context.HttpContext.RequestServices.GetRequiredService<ITokenBlacklistService>();
@@ -361,18 +373,27 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddRateLimiter(o => { foreach (var rule in new[] { ("judge-run", 10), ("judge-submit", 5) }) o.AddPolicy(rule.Item1, c => RateLimitPartition.GetSlidingWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => JudgeRateLimits.Options(rule.Item1 == "judge-submit"))); });
 builder.Services.AddRateLimiter(o => o.AddPolicy("learning-heartbeat", c => RateLimitPartition.GetFixedWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddRateLimiter(o => o.AddPolicy("learning-write", c => RateLimitPartition.GetFixedWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+builder.Services.AddRateLimiter(o => o.AddPolicy("notifications-write", c => RateLimitPartition.GetFixedWindowLimiter(c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration, builder.Environment);
 builder.Services.AddLearning(builder.Configuration);
+
+// SignalR powers the realtime notification channel (and the AI hint hub when enabled).
+builder.Services.AddSignalR();
+// Override the infrastructure no-op notifier with the SignalR-backed implementation.
+builder.Services.AddScoped<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
 if (builder.Configuration.GetValue<bool>("Judge:Enabled")) builder.Services.AddCodeJudge(builder.Configuration);
 if (builder.Configuration.GetValue<bool>("Ai:Enabled"))
 {
     if (!builder.Configuration.GetValue<bool>("Judge:Enabled")) throw new InvalidOperationException("AI requires Judge:Enabled.");
     builder.Services.AddAiAssistant(builder.Configuration);
-    builder.Services.AddSignalR();
 }
 
+builder.Services.AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+builder.Services.AddRateLimiter(o => o.AddPolicy("users-password", c => RateLimitPartition.GetSlidingWindowLimiter(
+    c.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous",
+    _ => new SlidingWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(15), SegmentsPerWindow = 15, QueueLimit = 0 })));
 var app = builder.Build();
 if (args.Contains("--migrate-judge")) { using var scope = app.Services.CreateScope(); await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.MigrateAsync(scope.ServiceProvider.GetRequiredService<JudgeDbContext>().Database); return; }
 
@@ -500,13 +521,15 @@ app.MapGet("/health/redis", async (IRedisHealthProbe probe, HttpContext httpCont
 .RequireRateLimiting("health-rate-limit");
 
 if (builder.Configuration.GetValue<bool>("Ai:Enabled")) app.MapAiEndpoints();
+app.MapControllers();
 app.MapAuthEndpoints();
 app.MapAdminEndpoints();
-app.MapExerciseEndpoints();
 if (builder.Configuration.GetValue<bool>("Judge:Enabled")) app.MapJudgeEndpoints();
-app.MapTeacherEndpoints();
 app.MapClassEndpoints();
 app.MapLearningEndpoints();
+app.MapNotificationEndpoints();
+app.MapAdminNotificationEndpoints();
+app.MapHub<NotificationsHub>("/hubs/notifications").RequireAuthorization("ActiveUser");
 
 app.Run();
 

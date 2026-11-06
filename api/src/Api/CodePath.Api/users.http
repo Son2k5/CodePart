@@ -1,0 +1,75 @@
+### Cập nhật thông tin User (self-service + admin)
+# Biến dùng chung: host, accessToken (JWT người dùng hiện đăng nhập), adminAccessToken, userId, classId, facultyId
+# Profile response không bao giờ chứa password hash. PUT yêu cầu gửi lại version hiện tại (optimistic concurrency, conflict trả 409).
+# Xem thêm docs/USERS.md.
+
+### Xem profile của chính mình
+GET {{host}}/api/users/me
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Cập nhật profile (Student: thêm administrativeClassId; Teacher: thêm facultyId + academicTitle)
+# Không được gửi email / studentCode / role / status / userId qua endpoint này (bị từ chối 400).
+PUT {{host}}/api/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Nguyễn Văn An",
+  "phoneNumber": "0912345678",
+  "dateOfBirth": "2000-01-01",
+  "gender": "Male",
+  "avatarUrl": "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+  "administrativeClassId": null,
+  "facultyId": null,
+  "academicTitle": null,
+  "version": 1
+}
+
+### Đổi mật khẩu (rate limit 5 lần / 15 phút / user; thành công trả 204 và phải đăng nhập lại)
+PUT {{host}}/api/users/me/password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "oldPassword": "OldPass123",
+  "newPassword": "NewPass123",
+  "confirmPassword": "NewPass123"
+}
+
+### Upload ảnh đại diện (multipart: file + version; jpg/png/webp, tối đa 2 MiB)
+# REST Client: chọn file từ đường dẫn tương đối so với file .http này.
+POST {{host}}/api/users/me/avatar
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="version"
+
+1
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="avatar.jpg"
+Content-Type: image/jpeg
+
+< ./avatar.jpg
+--WebAppBoundary--
+
+### Admin sửa thông tin user bất kỳ (kể cả role + status; mọi thay đổi được ghi AuditLog)
+# version là version hiện tại của user đích. Admin không tự hạ quyền/xóa chính mình.
+PUT {{host}}/api/admin/users/{{userId}}
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "fullName": "Nguyễn Văn Bình",
+  "phoneNumber": "0987654321",
+  "dateOfBirth": "2001-05-30",
+  "gender": "Male",
+  "avatarUrl": null,
+  "administrativeClassId": null,
+  "facultyId": null,
+  "academicTitle": null,
+  "version": 1,
+  "role": "Student",
+  "status": "Active"
+}

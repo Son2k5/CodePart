@@ -18,12 +18,12 @@ public sealed partial class LearningService : ILearningExtras
         await Access(classId, a, false, ct);
         if (string.IsNullOrWhiteSpace(query) || query.Length > 200) Reject("CONTENT_INVALID", "Query must have 1–200 characters.");
         page = Math.Clamp(page, 1, 100000);
-        // MySQL full-text uses the accent-insensitive collation on Document. All user text is parameterized.
-        var matches = await db.TopicSearch.FromSqlInterpolated($"SELECT * FROM learning_search WHERE ClassId = {classId} AND MATCH(Document) AGAINST ({query} IN NATURAL LANGUAGE MODE) ORDER BY MATCH(Document) AGAINST ({query} IN NATURAL LANGUAGE MODE) DESC").AsNoTracking().ToListAsync(ct);
+        // MySQL full-text uses the accent-insensitive collation on learning_topics.SearchDocument. All user text is parameterized.
+        var matches = await db.Topics.FromSqlInterpolated($"SELECT * FROM learning_topics WHERE ClassId = {classId} AND IsDeleted = 0 AND MATCH(SearchDocument) AGAINST ({query} IN NATURAL LANGUAGE MODE) ORDER BY MATCH(SearchDocument) AGAINST ({query} IN NATURAL LANGUAGE MODE) DESC").IgnoreQueryFilters().AsNoTracking().ToListAsync(ct);
         var topics = await Ordered(classId, ct); var done = await db.TopicProgress.Where(p => p.UserId == a.Id && p.ClassId == classId && p.Status == LearningStatus.Completed).Select(p => p.TopicId).ToListAsync(ct);
         var allowed = topics.Where((t, i) => t.LockedReason(Now, i == 0 || done.Contains(topics[i - 1].Id)) == null).ToDictionary(t => t.Id);
-        var visible = matches.Where(m => allowed.ContainsKey(m.TopicId)).ToList();
-        return Ok(new { total = visible.Count, page, items = visible.Skip((page - 1) * 20).Take(20).Select(m => new { m.TopicId, allowed[m.TopicId].Title, allowed[m.TopicId].Slug, snippet = m.Document[..Math.Min(m.Document.Length, 240)] }) });
+        var visible = matches.Where(m => allowed.ContainsKey(m.Id)).ToList();
+        return Ok(new { total = visible.Count, page, items = visible.Skip((page - 1) * 20).Take(20).Select(m => new { TopicId = m.Id, allowed[m.Id].Title, allowed[m.Id].Slug, snippet = m.SearchDocument[..Math.Min(m.SearchDocument.Length, 240)] }) });
     }
     private async Task Recompute(Guid classId, Guid? topic, Guid? user, CancellationToken ct)
     {
@@ -35,8 +35,8 @@ public sealed partial class LearningService : ILearningExtras
     {
         var c = await Access(id, a, true, ct);
         if (c.Mode != ClassMode.Managed) Reject("CLASS_MODE_NOT_SUPPORTED", "SelfStudy has no gradebook.");
-        var config = await db.ClassScoreConfigs.FindAsync([id], ct);
-        if (action == "get-config") return Ok(config == null ? new ScoreConfiguration(new(), []) : JsonSerializer.Deserialize<ScoreConfiguration>(config.Configuration, Json)!);
+        var config = c.ScoreConfiguration;
+        if (action == "get-config") return Ok(config == null ? new ScoreConfiguration(new(), []) : JsonSerializer.Deserialize<ScoreConfiguration>(config, Json)!);
         if (action == "put-config")
         {
             var value = (ScoreConfiguration)input!; var p = value.LatePolicy;
@@ -45,8 +45,7 @@ public sealed partial class LearningService : ILearningExtras
                 Reject("CONTENT_INVALID", "Invalid score configuration; category weights must total 100.");
             var ids = value.Categories!.SelectMany(c => c.TopicIds).ToArray();
             if (ids.Distinct().Count() != ids.Length || await db.Topics.CountAsync(t => t.ClassId == id && ids.Contains(t.Id), ct) != ids.Length) Reject("CONTENT_INVALID", "Categories must reference distinct topics in this class.");
-            if (config == null) { config = new() { ClassId = id }; db.ClassScoreConfigs.Add(config); }
-            config.Configuration = JsonSerializer.Serialize(value, Json); await Save(id, a, "ScoreConfig", id, ct);
+            c.ScoreConfiguration = JsonSerializer.Serialize(value, Json); await Save(id, a, "ScoreConfig", id, ct);
             await Recompute(id, null, null, ct); return Ok(value);
         }
         if (action == "recompute") { await Recompute(id, null, null, ct); await Save(id, a, "Recompute", id, ct); return Ok(new { recomputed = true }); }
@@ -61,7 +60,7 @@ public sealed partial class LearningService : ILearningExtras
             db.ScoreEntries.Add(entry); await Save(id, a, "Adjustment: " + ContentValidator.Plain(r.Reason), r.UserId, ct); return Ok(entry);
         }
         var scores = await db.ScoreEntries.AsNoTracking().Where(s => s.ClassId == id).ToListAsync(ct);
-        var categories = config == null ? [] : JsonSerializer.Deserialize<ScoreConfiguration>(config.Configuration, Json)!.Categories;
+        var categories = c.ScoreConfiguration == null ? [] : JsonSerializer.Deserialize<ScoreConfiguration>(c.ScoreConfiguration, Json)!.Categories;
         return Ok(new { entries = scores, totals = scores.GroupBy(s => s.UserId).Select(g => new { userId = g.Key, total = g.Sum(s => s.EffectivePoints),
             categories = categories.Select(c => new { c.Name, c.Weight, points = g.Where(s => c.TopicIds.Contains(s.TopicId)).Sum(s => s.EffectivePoints) }) }) });
     }
@@ -72,10 +71,10 @@ public sealed partial class LearningService : ILearningExtras
         if (c.Mode != ClassMode.Managed) Reject("DEADLINE_NOT_ALLOWED", "SelfStudy has no deadlines.");
         if (r.NewDueAt.Kind != DateTimeKind.Utc || t.DueAt == null || r.NewDueAt <= t.DueAt || string.IsNullOrWhiteSpace(r.Reason) || r.Reason.Length > 2000) Reject("CONTENT_INVALID", "Extension must be later than the topic deadline and include a reason.");
         if (!await db.ClassEnrollments.AnyAsync(e => e.ClassId == c.Id && e.StudentId == r.UserId && e.Status == ClassEnrollmentStatus.Active, ct)) Reject("NOT_ENROLLED", "Student is not enrolled.");
-        var extension = await db.DeadlineExtensions.FindAsync([r.UserId, id], ct);
-        if (extension == null) { extension = new() { UserId = r.UserId, TopicId = id }; db.DeadlineExtensions.Add(extension); }
-        extension.NewDueAt = r.NewDueAt; extension.Reason = ContentValidator.Plain(r.Reason); extension.GrantedBy = a.Id;
-        await Save(c.Id, a, "Extension", r.UserId, ct); await Recompute(c.Id, id, r.UserId, ct); return Ok(extension);
+        var extension = await db.TopicProgress.FindAsync([r.UserId, id], ct);
+        if (extension == null) { extension = new() { UserId = r.UserId, TopicId = id, ClassId = c.Id, Status = LearningStatus.InProgress, LastAccessedAt = Now }; db.TopicProgress.Add(extension); }
+        extension.DueExtensionAt = r.NewDueAt; extension.ExtensionReason = ContentValidator.Plain(r.Reason); extension.ExtensionGrantedBy = a.Id;
+        await Save(c.Id, a, "Extension", r.UserId, ct); await Recompute(c.Id, id, r.UserId, ct); return Ok(new { r.UserId, TopicId = id, NewDueAt = r.NewDueAt, Reason = extension.ExtensionReason, GrantedBy = a.Id });
     }
     public async Task<Result<object>> Upstream(Guid id, Actor a, CancellationToken ct)
     {
@@ -84,6 +83,8 @@ public sealed partial class LearningService : ILearningExtras
         return Ok(new { t.SourceTopicId, t.SourcePublishedVersion, latestVersion = source?.PublishedVersion, hasUpdate = source != null && source.PublishedVersion > t.SourcePublishedVersion });
     }
     public Task<Result<object>> Clone(Guid targetId, CloneInput r, string key, Actor a, CancellationToken ct) => db.Database.CreateExecutionStrategy().ExecuteAsync(() => CloneCore(targetId, r, key, a, ct));
+    private static string CloneReceiptKey(Guid targetId, string key) => $"learning:clone:{targetId}:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))}";
+    private sealed record CloneReceiptState(string RequestHash, Guid[] Result);
     private async Task<Result<object>> CloneCore(Guid targetId, CloneInput r, string key, Actor a, CancellationToken ct)
     {
         db.ChangeTracker.Clear(); judge.ChangeTracker.Clear();
@@ -109,8 +110,15 @@ public sealed partial class LearningService : ILearningExtras
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await judge.Database.UseTransactionAsync(tx.GetDbTransaction(), ct);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT Id FROM classes WHERE Id = {targetId} FOR UPDATE", ct);
-        var receipt = await db.Set<CloneReceipt>().FindAsync([targetId, key], ct);
-        if (receipt != null) { if (receipt.RequestHash != hash) Reject("CONFLICT", "Idempotency key reused with different input."); return Ok(JsonSerializer.Deserialize<Guid[]>(receipt.Result)!); }
+        // Idempotency receipts live in Redis (24h TTL) instead of a dedicated table.
+        var receiptKey = CloneReceiptKey(targetId, key);
+        var receiptRaw = await redis.GetDatabase().StringGetAsync(receiptKey);
+        if (receiptRaw.HasValue)
+        {
+            var receipt = JsonSerializer.Deserialize<CloneReceiptState>((string)receiptRaw!, Json)!;
+            if (receipt.RequestHash != hash) Reject("CONFLICT", "Idempotency key reused with different input.");
+            return Ok(receipt.Result);
+        }
         var targetChapters = await db.Chapters.Where(c => c.ClassId == targetId).OrderBy(c => c.Order).ToListAsync(ct);
         var insertion = r.AfterChapterId.HasValue ? targetChapters.FindIndex(c => c.Id == r.AfterChapterId) + 1 : targetChapters.Count;
         if (r.AfterChapterId.HasValue && insertion == 0) Reject("CONTENT_INVALID", "Placement chapter not found.");
@@ -126,7 +134,7 @@ public sealed partial class LearningService : ILearningExtras
         foreach (var p in problems)
         {
             if (!r.CopyProblems) { problemMap[p.Id] = p.Id; continue; }
-            var copy = JsonSerializer.Deserialize<Problem>(JsonSerializer.Serialize(p))!; copy.Id = Guid.NewGuid(); copy.ClassId = targetId; copy.CourseId = null; copy.CreatedBy = a.Id; copy.CreatedAt = Now; copy.Status = ProblemStatus.Draft;
+            var copy = JsonSerializer.Deserialize<Problem>(JsonSerializer.Serialize(p))!; copy.Id = Guid.NewGuid(); copy.ClassId = targetId; copy.CreatedBy = a.Id; copy.CreatedAt = Now; copy.Status = ProblemStatus.Draft;
             foreach (var test in copy.TestCases) { test.Id = Guid.NewGuid(); test.ProblemId = copy.Id; }
             foreach (var starter in copy.StarterCodes) starter.ProblemId = copy.Id;
             judge.Problems.Add(copy); problemMap[p.Id] = copy.Id;
@@ -140,8 +148,8 @@ public sealed partial class LearningService : ILearningExtras
             db.Topics.Add(copy); created.Add(copy.Id);
             foreach (var e in exercises.Where(e => e.TopicId == t.Id && problemMap.ContainsKey(e.ProblemId))) db.TopicExercises.Add(new() { TopicId = copy.Id, ProblemId = problemMap[e.ProblemId], Points = e.Points, Order = e.Order, IsRequired = e.IsRequired });
         }
-        db.Set<CloneReceipt>().Add(new() { TargetClassId = targetId, Key = key, RequestHash = hash, Result = JsonSerializer.Serialize(created), CreatedAt = Now });
         await judge.SaveChangesAsync(ct); await Save(targetId, a, "Clone", r.SourceClassId, ct); await tx.CommitAsync(ct);
+        await redis.GetDatabase().StringSetAsync(receiptKey, JsonSerializer.Serialize(new CloneReceiptState(hash, created.ToArray()), Json), TimeSpan.FromHours(24));
         return Ok(created);
     }
     public async Task<Result<object>> Comments(Guid topicId, Guid? id, string action, CommentInput? input, int page, Actor a, CancellationToken ct)
@@ -172,16 +180,17 @@ public sealed partial class LearningService : ILearningExtras
     public async Task<Result<object>> Notes(Guid id, string action, NoteInput? input, Actor a, CancellationToken ct)
     {
         var t = await Topic(id, ct); if (t == null) Reject("NOT_FOUND", "Topic not found."); await Access(t!.ClassId, a, false, ct); await CheckUnlocked(t, a, ct);
-        var note = await db.TopicNotes.FindAsync([a.Id, id], ct);
-        if (action == "get") return Ok(new { note });
-        if (action == "delete") { if (note != null) db.TopicNotes.Remove(note); }
+        var progress = await db.TopicProgress.FindAsync([a.Id, id], ct);
+        static object? Shape(TopicProgress? p) => p == null || p.NoteUpdatedAt == null ? null : new { p.UserId, TopicId = p.TopicId, BlockId = p.NoteBlockId, Body = p.NoteBody, UpdatedAt = p.NoteUpdatedAt };
+        if (action == "get") return Ok(new { note = Shape(progress) });
+        if (action == "delete") { if (progress?.NoteUpdatedAt != null) { progress.NoteBody = null; progress.NoteBlockId = null; progress.NoteUpdatedAt = null; } }
         else {
             if (input == null || input.Body == null || input.Body.Length > 10000) Reject("CONTENT_INVALID", "Note too long.");
             if (input!.BlockId.HasValue && !JsonSerializer.Deserialize<ContentBlock[]>(t.PublishedContent, Json)!.Any(b => b.BlockId == input.BlockId)) Reject("BLOCK_INVALID", "Block not found.");
-            if (note == null) { note = new() { UserId = a.Id, TopicId = id }; db.TopicNotes.Add(note); }
-            note.Body = ContentValidator.Markdown(input.Body); note.BlockId = input.BlockId; note.UpdatedAt = Now;
+            if (progress == null) { progress = new() { UserId = a.Id, TopicId = id, ClassId = t.ClassId, Status = LearningStatus.InProgress, LastAccessedAt = Now }; db.TopicProgress.Add(progress); }
+            progress.NoteBody = ContentValidator.Markdown(input.Body); progress.NoteBlockId = input.BlockId; progress.NoteUpdatedAt = Now;
         }
-        await db.SaveChangesAsync(ct); return Ok(new { note });
+        await db.SaveChangesAsync(ct); return Ok(new { note = Shape(progress) });
     }
     public async Task<Result<byte[]>> Export(Guid id, Actor a, CancellationToken ct)
     {

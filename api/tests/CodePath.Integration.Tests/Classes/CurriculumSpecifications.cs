@@ -92,7 +92,7 @@ public class CurriculumSpecifications(CodePathApiFixture fixture)
         var id = created.GetProperty("id").GetGuid();
         using var scope = fixture.Factory.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(TopicStatus.Published, (await db.Topics.SingleAsync(t => t.Id == id)).Status);
-        Assert.True(await db.TopicSearch.AnyAsync(t => t.TopicId == id));
+        Assert.True(await db.Topics.AnyAsync(t => t.Id == id && t.SearchDocument != ""));
         var asset = new Asset { OwnerId = ownerId, Kind = AssetKind.Pdf, Status = AssetStatus.Pending, MimeType = "application/pdf", StorageKey = Guid.NewGuid().ToString("N"), CreatedAt = DateTime.UtcNow };
         db.LearningAssets.Add(asset); await db.SaveChangesAsync();
         var invalid = new[] {
@@ -176,12 +176,11 @@ public class CurriculumSpecifications(CodePathApiFixture fixture)
             new Problem { Title = prefix + " class", CreatedBy = other, ClassId = classId },
             new Problem { Title = prefix + " global", CreatedBy = other, Status = ProblemStatus.Published },
             new Problem { Title = prefix + " private", CreatedBy = other, ClassId = otherClass },
-            new Problem { Title = prefix + " draft", CreatedBy = other },
-            new Problem { Title = prefix + " course", CreatedBy = other, CourseId = Guid.NewGuid(), Status = ProblemStatus.Published }
+            new Problem { Title = prefix + " draft", CreatedBy = other }
         };
         judge.Problems.AddRange(problems); await judge.SaveChangesAsync();
         var result = await Json(await Send(HttpMethod.Get, $"/api/classes/{classId}/available-problems?search={prefix}&difficulty=Easy&pageSize=2", token));
-        Assert.Equal(3, result.GetProperty("total").GetInt32()); Assert.Equal(2, result.GetProperty("items").GetArrayLength());
+        Assert.Equal(2, result.GetProperty("total").GetInt32()); Assert.Equal(2, result.GetProperty("items").GetArrayLength());
         await Json(await Send(HttpMethod.Post, $"/api/classes/{classId}/topics/complete", token,
             Full(chapter) with { Exercises = [new(problems[2].Id, 0, 10, true)] }));
         Assert.Equal(HttpStatusCode.Forbidden, (await Send(HttpMethod.Post, $"/api/classes/{classId}/topics/complete", token,
@@ -198,14 +197,15 @@ public class CurriculumSpecifications(CodePathApiFixture fixture)
             .AddInterceptors(new FailAfterSave()).Options;
         await using var db = new AppDbContext(options);
         var service = new LearningService(db, services.GetRequiredService<JudgeDbContext>(), TimeProvider.System,
-            services.GetRequiredService<IConnectionMultiplexer>(), services.GetRequiredService<IPublisher>(), new ContentValidator(db, services.GetRequiredService<IConfiguration>()));
+            services.GetRequiredService<IConnectionMultiplexer>(), services.GetRequiredService<IPublisher>(), new ContentValidator(db, services.GetRequiredService<IConfiguration>()),
+            new CodePath.Infrastructure.Notifications.OutboxEventBus(db, TimeProvider.System));
         var judge = services.GetRequiredService<JudgeDbContext>();
         var problem = new Problem { Title = "Rollback problem", CreatedBy = owner, ClassId = classId };
         judge.Problems.Add(problem); await judge.SaveChangesAsync();
         var request = Full(chapter) with { Exercises = [new(problem.Id, 0, 10, true)] }; var audits = await existing.AuditLogs.CountAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateFullTopic(classId, request, new Actor(owner, false, true), default));
         Assert.False(await existing.Topics.AnyAsync(t => t.ClassId == classId));
-        Assert.False(await existing.TopicSearch.AnyAsync(t => t.ClassId == classId));
+        Assert.False(await existing.Topics.AnyAsync(t => t.ClassId == classId && t.SearchDocument != ""));
         Assert.False(await existing.TopicExercises.AnyAsync(e => e.ProblemId == problem.Id));
         Assert.Equal(audits, await existing.AuditLogs.CountAsync());
     }

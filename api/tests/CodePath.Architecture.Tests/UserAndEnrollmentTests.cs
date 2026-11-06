@@ -1,6 +1,5 @@
 using CodePath.Domain.Common.Exceptions;
 using CodePath.Domain.Users.Entities;
-using CodePath.Domain.Users.Enums;
 using CodePath.Shared.Kernel.Enums;
 using FluentAssertions;
 using Xunit;
@@ -105,50 +104,5 @@ public sealed class UserAndEnrollmentTests
 
         changeRole.Should().Throw<DomainRuleViolationException>();
         teacher.Role.Should().Be(UserRole.Teacher);
-    }
-
-    [Fact]
-    public void CreateEnrollment_ShouldLeaveGradingOutcomeUnknown()
-    {
-        var now = DateTime.UtcNow;
-        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), now);
-
-        enrollment.Status.Should().Be(EnrollmentStatus.Active);
-        enrollment.MidtermScore.Should().BeNull();
-        enrollment.FinalScore.Should().BeNull();
-        enrollment.TotalScore.Should().BeNull();
-        enrollment.IsPassed.Should().BeNull();
-    }
-
-    [Theory]
-    [InlineData(8, 6, 6.8, true)]
-    [InlineData(2, 3, 2.6, false)]
-    public void UpdateScores_ShouldCalculateOutcome(
-        double midterm,
-        double final,
-        double expectedTotal,
-        bool expectedPassed)
-    {
-        var now = DateTime.UtcNow;
-        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), now);
-
-        enrollment.UpdateScores((decimal)midterm, (decimal)final, now);
-
-        enrollment.TotalScore.Should().Be((decimal)expectedTotal);
-        enrollment.IsPassed.Should().Be(expectedPassed);
-        enrollment.Status.Should().Be(
-            expectedPassed ? EnrollmentStatus.Completed : EnrollmentStatus.Active);
-    }
-
-    [Fact]
-    public void Drop_WhenEnrollmentIsCompleted_ShouldThrow()
-    {
-        var now = DateTime.UtcNow;
-        var enrollment = Enrollment.Create(Guid.NewGuid(), Guid.NewGuid(), now);
-        enrollment.UpdateScores(8m, 8m, now);
-
-        Action act = () => enrollment.Drop(now);
-
-        act.Should().Throw<DomainRuleViolationException>();
     }
 }

@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { AccountMenu } from './AccountMenu';
+import { NotificationBell } from '../notifications/NotificationBell';
 import { useAuthStore } from '../auth/store/authStore';
 
 export function MemberHeader() {
@@ -15,12 +16,14 @@ export function MemberHeader() {
         <nav className="ml-auto hidden items-center gap-[22px] min-[761px]:flex min-[1101px]:gap-[38px]" aria-label="Điều hướng chính">
           {[
             { to: isTeacher ? '/teacher' : '/home', label: 'Trang chủ' },
-            { to: isTeacher ? '/teacher/courses' : '/courses', label: 'Khóa học' },
             { to: isTeacher ? '/teacher/classes' : '/classes', label: 'Lớp học' },
-            ...(!isTeacher ? [{ to: '/problems', label: 'Luyện tập' }] : []),
+            ...(!isTeacher ? [{ to: '/practice', label: 'Luyện tập' }] : []),
           ].map(({ to, label }) => <NavLink key={to} to={to} end={to === "/teacher"} className={({ isActive }) => `whitespace-nowrap py-[7px] text-[10px] tracking-[1px] text-[#727c80] uppercase hover:text-[#3e656b] min-[1101px]:text-xs min-[1101px]:tracking-[1.7px] ${isActive ? 'underline decoration-1 underline-offset-[9px]' : ''}`}>{label}</NavLink>)}
         </nav>
-        <AccountMenu />
+        <div className="flex items-center gap-2 min-[761px]:gap-3">
+          <NotificationBell />
+          <AccountMenu />
+        </div>
       </div>
     </header>
   );

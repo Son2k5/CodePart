@@ -1,0 +1,6 @@
+- All external I/O (LLM calls, Redis reads/writes, RAG operations) is wrapped in `async with asyncio.timeout(...)` blocks so endpoints fail fast instead of hanging.
+- Public endpoints return structured JSON via Pydantic `ErrorResponse` models with stable error codes (`AI_UNAVAILABLE`, `INVALID_CONTEXT`, `GUARD_FALLBACK`, `RAG_UNAVAILABLE`) rather than raw exceptions.
+- Authentication is centralized through a single `authenticate` dependency using `hmac.compare_digest` against `SERVICE_API_KEY`, applied via FastAPI `Depends` on routes and routers.
+- Request and response payloads are defined as Pydantic v2 `BaseModel` subclasses with explicit field constraints (length bounds, ranges, literal enums) and `extra='forbid'` on base `Model`.
+- Optional components (Redis cache, ML classifier) are injected through `app.state` during lifespan and treated as absent when not configured, with try/except guards around their usage.
+- Guardrails on LLM output are enforced post-call via `hint_guard.violations` before returning results, falling back to a canned message when policy is violated.

@@ -2,6 +2,8 @@ using System.Text.Json;
 using CodePath.Application.Classes;
 using CodePath.Application.Judge;
 using CodePath.Application.Learning;
+using CodePath.Application.Notifications.Abstractions;
+using CodePath.Application.Notifications.Events;
 using CodePath.Domain.Learning;
 using CodePath.Domain.Judge;
 using CodePath.Domain.Users.Entities;
@@ -15,7 +17,7 @@ using StackExchange.Redis;
 namespace CodePath.Infrastructure.Learning;
 
 public sealed partial class LearningService(AppDbContext db, JudgeDbContext judge, TimeProvider clock,
-    IConnectionMultiplexer redis, IPublisher publisher, ContentValidator content) : ILearningService
+    IConnectionMultiplexer redis, IPublisher publisher, ContentValidator content, IEventBus events) : ILearningService
 {
     private DateTime Now => clock.GetUtcNow().UtcDateTime;
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -73,7 +75,7 @@ public sealed partial class LearningService(AppDbContext db, JudgeDbContext judg
             var c = await ((IClassRepository)db).LockAsync(id, null, token);
             if (c == null) Reject("CLASS_NOT_FOUND", "Class not found.");
             if (mode == ClassMode.SelfStudy && (await db.Topics.AnyAsync(t => t.ClassId == id && t.DueAt != null, token)
-                || await db.ClassScoreConfigs.AnyAsync(s => s.ClassId == id, token) || await db.ScoreEntries.AnyAsync(s => s.ClassId == id, token)))
+                || await db.Classes.AnyAsync(c => c.Id == id && c.ScoreConfiguration != null, token) || await db.ScoreEntries.AnyAsync(s => s.ClassId == id, token)))
                 Reject("CLASS_MODE_NOT_SUPPORTED", "Remove deadlines and score configuration before changing mode.");
             c!.SetMode(mode, Now); await Save(id, a, "Mode", id, token); return Ok(new { c.Id, c.Mode });
         }, ct);
@@ -160,9 +162,11 @@ public sealed partial class LearningService(AppDbContext db, JudgeDbContext judg
                 t.PublishAt = action == "schedule" ? (DateTime?)input : null;
                 if (action == "schedule" && (t.PublishAt <= Now || t.PublishAt?.Kind != DateTimeKind.Utc)) Reject("CONTENT_INVALID", "Schedule must be a future UTC timestamp.");
                 t.Publish(Now);
-                var index = await db.TopicSearch.FindAsync([id], ct);
-                if (index == null) { index = new() { TopicId = id, ClassId = t.ClassId }; db.TopicSearch.Add(index); }
-                index.Document = ContentValidator.SearchText(t); index.UpdatedAt = Now; break;
+                t.SearchDocument = ContentValidator.SearchText(t);
+                // Notify enrolled students only on an immediate publish (schedule defers visibility).
+                if (action == "publish")
+                    await events.PublishAsync(new NewTopicPublishedNotification(t.ClassId, id, t.Title), ct);
+                break;
             case "unpublish": t.Status = TopicStatus.Draft; break;
             case "completion-rule":
                 var rule = (CompletionRule)input!; if (!new CompletionRuleValidator().Validate(rule).IsValid) Reject("CONTENT_INVALID", "Invalid completion rule.");

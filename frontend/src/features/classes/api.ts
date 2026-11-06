@@ -13,7 +13,31 @@ export interface ClassItem {
   startDate: string | null; endDate: string | null; createdAt: string; rowVersion: string;
   studentCount: number; teachers: Teacher[];
 }
-export interface PublicClass { id: string; name: string; description: string; thumbnail: string | null; maxStudents: number | null; studentCount: number; isEnrolled: boolean }
+export interface PublicClass {
+  id: string;
+  name: string;
+  description: string;
+  thumbnail: string | null;
+  maxStudents: number | null;
+  studentCount: number;
+  isEnrolled: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+export interface StudentClassInfo {
+  id: string;
+  name: string;
+  description: string;
+  thumbnail: string | null;
+  status: 'Draft' | 'Active' | 'Archived';
+  accessType: 'Public' | 'CodeRequired';
+  maxStudents: number | null;
+  studentCount: number;
+  startDate: string | null;
+  endDate: string | null;
+  isEnrolled: boolean;
+  teachers: { fullName: string; avatarUrl: string | null }[];
+}
 export interface Student { id: string; fullName: string; email: string; joinedAt: string; joinMethod: string }
 export interface Page<T> { items: T[]; page: number; pageSize: number; totalCount: number; totalPages: number }
 export function useDebounced<T>(value: T) {

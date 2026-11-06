@@ -1,0 +1,2 @@
+- Service configuration is externalized per environment via `.env` files read at startup rather than hard-coded.
+- Optional cross-service features (AI, RAG) are gated by boolean flags in the backend's config and exposed through Docker Compose profiles.

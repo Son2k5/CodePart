@@ -1,0 +1,1 @@
+Cross-cutting runtime stack: .NET 8 (backend), Node.js/npm (frontend), Python/FastAPI (AI), MySQL + Redis (data/cache), Docker Compose (service composition), nginx (production reverse proxy).

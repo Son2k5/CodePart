@@ -73,6 +73,8 @@ public static class ClassEndpoints
         var student = app.MapGroup("/api/classes").RequireAuthorization("ActiveStudent").WithTags("Student Classes");
         student.MapGet("/public", async ([AsParameters] ClassFilter f, HttpContext ctx, ISender sender, CancellationToken ct) =>
             (await sender.Send(new PublicClassesQuery(f, Actor(ctx)), ct)).ToHttpResult());
+        student.MapGet("/{id:guid}/info", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
+            (await sender.Send(new StudentClassInfoQuery(id, Actor(ctx)), ct)).ToHttpResult());
         student.MapPost("/{id:guid}/join", async (Guid id, HttpContext ctx, ISender sender, CancellationToken ct) =>
             (await sender.Send(new JoinClassCommand(Actor(ctx), id, null), ct)).ToHttpResult());
         student.MapPost("/join-by-code", async (JoinBody body, HttpContext ctx, ISender sender, CancellationToken ct) =>

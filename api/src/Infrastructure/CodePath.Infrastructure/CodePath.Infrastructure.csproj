@@ -16,6 +16,7 @@
     <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="System.Text.Json" />
     <PackageReference Include="StackExchange.Redis" />
@@ -30,5 +31,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Application\CodePath.Application\CodePath.Application.csproj" />
     <ProjectReference Include="..\..\Domain\CodePath.Domain\CodePath.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodePath.Unit.Tests" />
   </ItemGroup>
 </Project>

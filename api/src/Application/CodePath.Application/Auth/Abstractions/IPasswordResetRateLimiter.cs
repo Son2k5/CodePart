@@ -2,5 +2,6 @@ namespace CodePath.Application.Auth.Abstractions;
 
 public interface IPasswordResetRateLimiter
 {
-    Task<bool> TryAcquireAsync(string normalizedEmail);
+    /// <summary>Coarse throttling on both the target email and the requesting IP.</summary>
+    Task<bool> TryAcquireAsync(string normalizedEmail, string? ipAddress);
 }

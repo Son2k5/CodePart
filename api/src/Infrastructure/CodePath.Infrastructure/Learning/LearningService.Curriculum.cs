@@ -2,6 +2,7 @@ using System.Text.Json;
 using CodePath.Application.Classes;
 using CodePath.Application.Judge;
 using CodePath.Application.Learning;
+using CodePath.Application.Notifications.Events;
 using CodePath.Domain.Judge;
 using CodePath.Domain.Learning;
 using CodePath.Domain.Users.Entities;
@@ -75,7 +76,7 @@ public sealed partial class LearningService : ICurriculumService
     }
 
     private IQueryable<Problem> UsableProblems(Guid classId, Actor a) => judge.Problems.Where(p =>
-        a.IsAdmin || p.ClassId == classId || p.CreatedBy == a.Id || p.ClassId == null && p.CourseId == null && p.Status == ProblemStatus.Published);
+        a.IsAdmin || p.ClassId == classId || p.CreatedBy == a.Id || p.ClassId == null && p.Status == ProblemStatus.Published);
 
     private async Task ValidateExercises(Guid classId, ExerciseInput[] exercises, Actor a, CancellationToken ct, Guid? topicId = null)
     {
@@ -139,7 +140,9 @@ public sealed partial class LearningService : ICurriculumService
             if (r.PublishImmediately)
             {
                 t.Publish(Now);
-                db.TopicSearch.Add(new() { TopicId = t.Id, ClassId = classId, Document = ContentValidator.SearchText(t), UpdatedAt = Now });
+                t.SearchDocument = ContentValidator.SearchText(t);
+                // Notify enrolled students; the outbox row commits with SaveChanges below.
+                await events.PublishAsync(new NewTopicPublishedNotification(classId, t.Id, t.Title), token);
             }
             await Save(classId, a, "Topic.CreateFull", t.Id, token);
             return Ok(new { t.Id, t.RowVersion, t.Status, t.PublishedVersion });

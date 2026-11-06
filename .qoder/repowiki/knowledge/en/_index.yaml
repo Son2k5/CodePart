@@ -1,0 +1,53 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-10-23T12:25:08Z"
+modules:
+    "":
+        dir_name: CodePath Learning Platform Monorepo
+        title: CodePath Learning Platform Monorepo
+        scope:
+            - package.json
+            - package-lock.json
+            - .codex-library-edit.py
+            - HUONG_DAN_CHAY_DU_AN.txt
+        source_files: []
+        children:
+            - ai_service
+            - api_backend
+            - frontend_app
+        depends_on: []
+        related_to: []
+    ai_service:
+        dir_name: CodePath AI Hint & RAG Service
+        title: CodePath AI Hint & RAG Service
+        scope:
+            - ai-service/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: api_backend
+    api_backend:
+        dir_name: CodePath API Backend (ASP.NET Minimal API)
+        title: CodePath API Backend (ASP.NET Minimal API)
+        scope:
+            - api/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: ai_service
+            - path: frontend_app
+    frontend_app:
+        dir_name: CodePart Frontend Application
+        title: CodePart Frontend Application
+        scope:
+            - frontend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: api_backend

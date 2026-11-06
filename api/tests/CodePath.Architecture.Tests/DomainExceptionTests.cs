@@ -41,26 +41,4 @@ public class DomainExceptionTests
             .WithMessage("*Only students can be assigned to a class*");
     }
 
-    [Fact]
-    public void ActivateCourse_WhenAlreadyActive_ShouldThrowDomainRuleViolationException()
-    {
-        // Arrange
-        var course = Course.Create(
-            subjectName: "C# Programming",
-            sectionCode: "CS101",
-            language: "Vietnamese",
-            semester: "Fall 2026",
-            joinCode: "CODE12",
-            teacherId: Guid.NewGuid(),
-            utcNow: DateTime.UtcNow);
-
-        course.Activate(DateTime.UtcNow);
-
-        // Act
-        var act = () => course.Activate(DateTime.UtcNow);
-
-        // Assert
-        act.Should().Throw<DomainRuleViolationException>()
-            .WithMessage("*Course is already active*");
-    }
 }

@@ -37,7 +37,7 @@ public sealed partial class LearningService
         var problemIds = exercises.Select(e => e.ProblemId).ToArray();
         var submissions = await judge.Submissions.AsNoTracking().Where(s => s.UserId == a.Id && s.TopicId == t.Id && problemIds.Contains(s.ProblemId)).ToListAsync(ct);
         var scores = await db.ScoreEntries.AsNoTracking().Where(s => s.UserId == a.Id && s.TopicId == t.Id).ToListAsync(ct);
-        var extension = await db.DeadlineExtensions.FindAsync([a.Id, t.Id], ct); var due = extension?.NewDueAt ?? t.DueAt;
+        var due = progress.DueExtensionAt ?? t.DueAt;
         var ordered = await Ordered(classId, ct); var position = ordered.FindIndex(x => x.Id == t.Id);
         return Ok(new { t.Id, t.Title, t.Slug, t.Summary, t.PublishedVersion, content = JsonSerializer.Deserialize<ContentBlock[]>(t.PublishedContent, Json),
             exercises = exercises.Select(e => new { e.ProblemId, e.Order, e.Points, e.IsRequired,
@@ -117,7 +117,7 @@ public sealed partial class LearningService
         if (p.Status != LearningStatus.Completed && CompletionEvaluator.Complete(rule, videos, pdfs, p.ExercisePassedCount, exercises.Count, exercises.Count(e => e.IsRequired && passed.Contains(e.ProblemId)), exercises.Count(e => e.IsRequired), manual))
         {
             p.Status = LearningStatus.Completed; p.CompletedAt = Now;
-            var ext = await db.DeadlineExtensions.FindAsync([user, t.Id], ct); p.CompletedLate = (ext?.NewDueAt ?? t.DueAt) < Now;
+            p.CompletedLate = (p.DueExtensionAt ?? t.DueAt) < Now;
             await Activity(user, ct); await Award(user, "FIRST_TOPIC", t.ClassId, ct);
             await publisher.Publish(new TopicCompleted(user, t.Id, t.ClassId), ct);
             var all = await Ordered(t.ClassId, ct); var done = await db.TopicProgress.Where(x => x.UserId == user && x.ClassId == t.ClassId && x.Status == LearningStatus.Completed).Select(x => x.TopicId).ToListAsync(ct); done.Add(t.Id);
@@ -153,16 +153,15 @@ public sealed partial class LearningService
         var c = await db.Classes.SingleAsync(c => c.Id == t.ClassId, ct);
         if (c.Mode == ClassMode.Managed)
         {
-            var config = await db.ClassScoreConfigs.FindAsync([t.ClassId], ct);
-            var policy = config == null ? new LatePolicy() : JsonSerializer.Deserialize<ScoreConfiguration>(config.Configuration, Json)!.LatePolicy;
-            var ext = await db.DeadlineExtensions.FindAsync([e.UserId, t.Id], ct);
+            var policy = c.ScoreConfiguration == null ? new LatePolicy() : JsonSerializer.Deserialize<ScoreConfiguration>(c.ScoreConfiguration, Json)!.LatePolicy;
+            var ext = await db.TopicProgress.FindAsync([e.UserId, t.Id], ct);
             foreach (var exercise in await VisibleExercises(t.Id, ct))
             {
                 var candidates = submissions.Where(s => s.ProblemId == exercise.ProblemId).Select(s => {
                     var snapshot = JsonSerializer.Deserialize<Problem>(s.Snapshot)!;
                     return (snapshot.Points == 0 ? 0 : exercise.Points * s.Score / snapshot.Points, s.CreatedAt);
                 });
-                var best = ScoreCalculator.Best(candidates, t.DueAt, ext?.NewDueAt, policy);
+                var best = ScoreCalculator.Best(candidates, t.DueAt, ext?.DueExtensionAt, policy);
                 // Source includes topic ID so shared problems in different topics do not overwrite scores.
                 var source = "Exercise"; var refId = ExerciseScoreId(t.Id, exercise.ProblemId);
                 var score = await db.ScoreEntries.FindAsync([e.UserId, source, refId], ct);

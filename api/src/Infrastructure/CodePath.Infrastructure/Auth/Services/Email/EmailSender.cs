@@ -59,8 +59,8 @@ public sealed class EmailSender : IEmailSender
         var resetUrl = $"{_frontendOptions.PublicBaseUrl.TrimEnd('/')}/reset-password#token={Uri.EscapeDataString(resetToken)}";
         var body = new BodyBuilder
         {
-            TextBody = $"Use this link to reset your CodePath password: {resetUrl}. The link expires in 30 minutes.",
-            HtmlBody = $"<p>A password reset was requested for your CodePath account.</p><p><a href=\"{resetUrl}\">Reset password</a></p><p>The link expires in 30 minutes. Ignore this email if you did not request it.</p>"
+            TextBody = $"Use this link to reset your CodePath password: {resetUrl}. The link expires in 15 minutes.",
+            HtmlBody = $"<p>A password reset was requested for your CodePath account.</p><p><a href=\"{resetUrl}\">Reset password</a></p><p>The link expires in 15 minutes. Ignore this email if you did not request it.</p>"
         }.ToMessageBody();
 
         await SendAsync(toEmail, "Reset your CodePath password", body, ct);
@@ -83,6 +83,28 @@ public sealed class EmailSender : IEmailSender
         }.ToMessageBody();
 
         await SendAsync(toEmail, "Your CodePath password was changed", body, ct);
+    }
+
+    public async Task SendNotificationEmailAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string? textBody = null,
+        CancellationToken ct = default)
+    {
+        if (_environment.IsEnvironment("Testing"))
+        {
+            _logger.LogDebug("Notification email delivery suppressed in Testing for {Recipient}.", toEmail);
+            return;
+        }
+
+        var body = new BodyBuilder
+        {
+            TextBody = textBody ?? "",
+            HtmlBody = htmlBody
+        }.ToMessageBody();
+
+        await SendAsync(toEmail, subject, body, ct);
     }
 
     private async Task SendAsync(

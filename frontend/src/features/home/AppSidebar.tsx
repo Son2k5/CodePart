@@ -6,9 +6,8 @@ import { useLogout } from '../auth/hooks/useAuth';
 
 const studentApps = [
   { to: '/home', label: 'Bàn làm việc', icon: Home, color: 'from-blue-400 to-blue-600', group: 'Không gian của bạn' },
-  { to: '/courses', label: 'Khóa học của tôi', icon: BookOpen, color: 'from-emerald-400 to-emerald-600', group: 'Học tập' },
   { to: '/classes', label: 'Khám phá lớp học', icon: Users, color: 'from-cyan-400 to-sky-600', group: 'Học tập' },
-  { to: '/problems', label: 'Luyện tập', icon: Code2, color: 'from-violet-400 to-indigo-600', group: 'Học tập' },
+  { to: '/practice', label: 'Luyện tập', icon: Code2, color: 'from-violet-400 to-indigo-600', group: 'Học tập' },
 ];
 const normalize = (value: string) => value.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').trim();
 
@@ -18,8 +17,7 @@ export function AppSidebar() {
   const apps = role === 'Admin' ? [
     { to: '/admin/classes', label: 'Không gian lớp học', icon: BookOpen, color: 'from-emerald-400 to-emerald-600', group: 'Lớp học' },
   ] : role === 'Teacher' ? [
-    { to: '/teacher/courses', label: 'Lớp học phần', icon: BookOpen, color: 'from-emerald-400 to-emerald-600', group: 'Giảng dạy' },
-    { to: '/teacher/classes', label: 'Lớp được phân công', icon: Users, color: 'from-cyan-400 to-sky-600', group: 'Giảng dạy' },
+    { to: '/teacher/classes', label: 'Lớp niên khóa', icon: Users, color: 'from-cyan-400 to-sky-600', group: 'Giảng dạy' },
   ] : studentApps;
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState('');

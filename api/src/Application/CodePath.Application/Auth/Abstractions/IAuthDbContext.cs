@@ -18,10 +18,13 @@ public interface IAuthDbContext
     Task<int> RevokeRefreshTokenAsync(string tokenHash, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
     Task<int> RevokeAllUserRefreshTokensAsync(Guid userId, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
     Task<bool> RevokeAllUserSessionsAsync(Guid userId, DateTime revokedAtUtc, string? revokedByIp, CancellationToken cancellationToken = default);
-    Task ReplaceActivePasswordResetTokenAsync(PasswordResetToken token, DateTime utcNow, CancellationToken cancellationToken = default);
-    Task<PasswordResetCompletion?> TryConsumePasswordResetTokenAsync(string tokenHash, string newPasswordHash, DateTime utcNow, string? ipAddress, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Stateless reset: applies the new password only when <paramref name="expectedFingerprint"/>
+    /// still matches the stored hash (token replay after a reset therefore fails), revokes all
+    /// refresh tokens, bumps the security version and writes the audit entry atomically.
+    /// </summary>
+    Task<PasswordResetCompletion?> TryResetPasswordAsync(Guid userId, string expectedFingerprint, string newPasswordHash, DateTime utcNow, string? ipAddress, CancellationToken cancellationToken = default);
     Task<int> DeleteExpiredRefreshTokensAsync(DateTime expiredBeforeUtc, CancellationToken cancellationToken = default);
-    Task<int> DeleteExpiredPasswordResetTokensAsync(DateTime expiredBeforeUtc, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

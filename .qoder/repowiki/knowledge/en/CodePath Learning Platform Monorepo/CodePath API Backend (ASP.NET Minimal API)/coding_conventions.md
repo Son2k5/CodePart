@@ -1,0 +1,6 @@
+- Feature boundaries are expressed as sibling folders under both Application and Infrastructure (`Admin`, `Auth`, `Classes`, `Exercises`, `Teaching`, `Users`, `Ai`, `Judge`, `Learning`), with each feature's public surface defined in an `Abstractions/` subfolder of Application.
+- Configuration is bound via strongly-typed Options classes (e.g. `JwtOptions`, `AuthSessionOptions`, `DatabasePoolOptions`, `LoginSecurityOptions`) registered with `Bind(...).ValidateDataAnnotations().ValidateOnStart()`.
+- Request handling uses MediatR commands/queries paired with FluentValidation validators, wrapped globally by `LoggingBehavior` and `ValidationBehavior` open behaviors.
+- Application code returns `Result<T>` / `IResult` from Shared.Kernel rather than throwing for expected failures; errors are surfaced through the global `GlobalExceptionHandler`.
+- External concerns (email, OTP, login attempts, token blacklist, password hashing, session policy, code execution) are declared as interfaces in Application.Abstractions and implemented in Infrastructure.Services, keeping the application layer framework-free.
+- EF Core models live in Domain/entities while their mappings are isolated in Infrastructure/Persistence/Configurations/*Configuration.cs files, one per entity.

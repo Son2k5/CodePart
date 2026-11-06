@@ -1,0 +1,1 @@
+React 19 + TypeScript + Vite 8 + Tailwind CSS v4; routing via react-router-dom v7; data fetching via @tanstack/react-query; form validation via react-hook-form + zod; global state via zustand; code editing via monaco-editor and @uiw/react-codemirror; linting via oxlint; testing via vitest + @testing-library/react; e2e via playwright; API mocking via msw.

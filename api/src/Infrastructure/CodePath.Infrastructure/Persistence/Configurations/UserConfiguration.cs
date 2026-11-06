@@ -10,6 +10,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.ToTable("users");
+        builder.HasCharSet("utf8mb4").UseCollation("utf8mb4_unicode_ci");
+        builder.Property(u => u.DateOfBirth).HasColumnType("date");
+        builder.Property(u => u.Gender).HasColumnType("varchar(20)").HasMaxLength(20);
+        builder.Property(u => u.AvatarUrl).HasColumnType("varchar(2048)").HasMaxLength(2048);
+        builder.Property(u => u.AcademicTitle).HasColumnType("varchar(100)").HasMaxLength(100);
+        builder.Property(u => u.Version).HasDefaultValue(1).IsConcurrencyToken();
+        builder.Property(u => u.SecurityVersion).IsConcurrencyToken();
         builder.Property(u => u.TeacherId).HasMaxLength(50).HasColumnType("varchar(50)");
         builder.HasIndex(u => u.TeacherId).IsUnique().HasDatabaseName("ux_users_teacher_id");
         builder.Property(u => u.PhoneNumber).HasMaxLength(20).HasColumnType("varchar(20)");

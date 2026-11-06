@@ -1,0 +1,1 @@
+FastAPI service that classifies student code stages, generates guarded LLM hints with optional RAG-augmented learning material Q&A, and exposes them over authenticated HTTP endpoints.

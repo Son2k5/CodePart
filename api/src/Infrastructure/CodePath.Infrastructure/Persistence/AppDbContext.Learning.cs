@@ -10,11 +10,8 @@ public partial class AppDbContext
     public DbSet<BlockProgress> BlockProgress => Set<BlockProgress>();
     public DbSet<Asset> LearningAssets => Set<Asset>();
     public DbSet<ActivityDay> ActivityDays => Set<ActivityDay>();
-    public DbSet<ClassScoreConfig> ClassScoreConfigs => Set<ClassScoreConfig>();
-    public DbSet<StudentDeadlineExtension> DeadlineExtensions => Set<StudentDeadlineExtension>();
     public DbSet<ScoreEntry> ScoreEntries => Set<ScoreEntry>();
-    public DbSet<TopicSearchIndex> TopicSearch => Set<TopicSearchIndex>();
     public DbSet<UserBadge> UserBadges => Set<UserBadge>();
     public DbSet<TopicComment> TopicComments => Set<TopicComment>();
-    public DbSet<TopicNote> TopicNotes => Set<TopicNote>();
+    public DbSet<ClassAnnouncement> ClassAnnouncements => Set<ClassAnnouncement>();
 }

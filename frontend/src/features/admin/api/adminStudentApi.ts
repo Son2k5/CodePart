@@ -46,7 +46,6 @@ const mapStudent = (s: StudentResponse): AdminUserItem => ({
   phone: s.phone ?? '',
   bio: s.bio ?? '',
   enrolledClasses: s.enrolledClasses,
-  enrolledCourses: s.enrolledCourses,
 });
 
 const studentProfile = (d: StudentFormData) => ({

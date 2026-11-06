@@ -1,0 +1,1 @@
+ASP.NET Core minimal-API backend implementing the CodePath learning platform, exposing admin, auth, exercise/judge, class, teacher, and AI endpoints over MySQL + Redis.

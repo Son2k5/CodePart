@@ -1,0 +1,1 @@
+React + Vite frontend for the CodePart learning platform, providing landing pages, authentication, admin/teacher/student dashboards, an online code judge, and a workspace editor.

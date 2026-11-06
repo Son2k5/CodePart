@@ -1,4 +1,5 @@
 using CodePath.Application.Classes;
+using CodePath.Application.Notifications.Abstractions;
 using CodePath.Domain.Common.Exceptions;
 using CodePath.Domain.Users.Entities;
 using CodePath.Shared.Kernel.Enums;
@@ -71,7 +72,7 @@ public class ClassManagementTests
         db.Setup(x => x.TransactionAsync(It.IsAny<Func<CancellationToken, Task<CodePath.Shared.Kernel.Common.Result<Guid>>>>(), It.IsAny<CancellationToken>()))
             .Returns((Func<CancellationToken, Task<CodePath.Shared.Kernel.Common.Result<Guid>>> action, CancellationToken ct) => action(ct));
         db.Setup(x => x.LockAsync(null, c.JoinCode, It.IsAny<CancellationToken>())).ReturnsAsync(c);
-        var handler = new ClassCommandHandlers(db.Object, new FixedClock(Now.AddHours(1)), new JoinCodeGenerator());
+        var handler = new ClassCommandHandlers(db.Object, new FixedClock(Now.AddHours(1)), new JoinCodeGenerator(), Mock.Of<IEventBus>());
         var act = () => handler.Handle(new JoinClassCommand(student, null, c.JoinCode), default);
         (await act.Should().ThrowAsync<DomainRuleViolationException>()).Which.ErrorCode.Should().Be("JOIN_CODE_EXPIRED");
         db.Verify(x => x.SaveAsync(It.IsAny<CancellationToken>()), Times.Never);

@@ -91,7 +91,7 @@ public class JudgePersistenceTests
         using var accounts = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().Options);
         var service = new JudgeService(db, new TestAccess(), new FakeExecutor(), new JudgeQueue());
         var admin = new Actor(Guid.NewGuid(), true, false);
-        var created = await service.SaveProblem(null, new("MySQL management", "Sum the input", "Easy", 1000, 64, 100, TestAccess.CourseId,
+        var created = await service.SaveProblem(null, new("MySQL management", "Sum the input", "Easy", 1000, 64, 100,
             ComparisonMode.Lines, [new("python", "print(42)")]), admin, default);
         Assert.True(created.IsSuccess, created.Error);
         var id = JsonSerializer.SerializeToElement(created.Value).GetProperty("Id").GetGuid();
@@ -106,6 +106,27 @@ public class JudgePersistenceTests
         var persisted = await db.Problems.Include(p => p.TestCases).SingleAsync(p => p.Id == id);
         Assert.Equal(10, persisted.TestCases.Count);
         Assert.Equal("43", persisted.TestCases.Single(t => t.Order == 1).ExpectedOutput);
+    }
+    [JudgeDatabaseFact]
+    public async Task Bulk_import_creates_problems_atomically_and_rolls_back_on_invalid_item()
+    {
+        await using var services = Provider(new FakeExecutor());
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<JudgeDbContext>(); await db.Database.MigrateAsync();
+        var service = new JudgeService(db, new TestAccess(), new FakeExecutor(), new JudgeQueue());
+        var admin = new Actor(Guid.NewGuid(), true, false);
+        ProblemWrite Write(string title) => new(title, "Sum the input", "Easy", 1000, 64, 100, ComparisonMode.Lines, [new("python", "print(42)")]);
+        var tests = Enumerable.Range(1, 10).Select(i => new TestWrite("", "42", i == 1, i, 1)).ToList();
+        var import = await service.ImportProblems([new(Write("Bulk A"), tests, true), new(Write("Bulk B"))], admin, default);
+        Assert.True(import.IsSuccess, import.Error);
+        Assert.Equal(2, JsonSerializer.SerializeToElement(import.Value).GetProperty("Imported").GetInt32());
+        Assert.Equal(ProblemStatus.Published, (await db.Problems.SingleAsync(p => p.Title == "Bulk A")).Status);
+        Assert.Equal(10, (await db.Problems.Include(p => p.TestCases).SingleAsync(p => p.Title == "Bulk A")).TestCases.Count);
+        Assert.Equal(ProblemStatus.Draft, (await db.Problems.SingleAsync(p => p.Title == "Bulk B")).Status);
+        // A single invalid item rolls back the whole batch, so nothing from it is persisted.
+        var bad = await service.ImportProblems([new(Write("Bulk C"), tests), new(new("Bad", "", "Nope", 1, 1, 1, ComparisonMode.Lines, [new("python", "x")]))], admin, default);
+        Assert.False(bad.IsSuccess);
+        Assert.Equal(0, await db.Problems.CountAsync(p => p.Title == "Bulk C"));
     }
     [JudgeDatabaseFact]
     public async Task Class_scope_hides_other_classes_and_drafts_and_rejects_execution_without_membership()
@@ -156,17 +177,17 @@ public class JudgePersistenceTests
         c.Teachers.Add(assignment); c.ClassEnrollments.Add(enrollment);
         accounts.Users.AddRange(teacher, student); accounts.Classes.Add(c); await accounts.SaveChangesAsync();
         var access = new JudgeAccess(accounts);
-        Assert.True(await access.CanAccess(null, c.Id, new(teacher.Id, false, true), true, default));
-        Assert.False(await access.CanAccess(null, c.Id, new(Guid.NewGuid(), false, true), true, default));
-        Assert.True(await access.CanAccess(null, c.Id, new(student.Id, false, false), false, default));
-        Assert.False(await access.CanAccess(null, Guid.NewGuid(), new(Guid.NewGuid(), true, false), true, default));
+        Assert.True(await access.CanAccess(c.Id, new(teacher.Id, false, true), true, default));
+        Assert.False(await access.CanAccess(c.Id, new(Guid.NewGuid(), false, true), true, default));
+        Assert.True(await access.CanAccess(c.Id, new(student.Id, false, false), false, default));
+        Assert.False(await access.CanAccess(Guid.NewGuid(), new(Guid.NewGuid(), true, false), true, default));
         accounts.ClassTeachers.Remove(assignment); await accounts.SaveChangesAsync();
-        Assert.False(await access.CanAccess(null, c.Id, new(teacher.Id, false, true), true, default));
+        Assert.False(await access.CanAccess(c.Id, new(teacher.Id, false, true), true, default));
         enrollment.Remove(); await accounts.SaveChangesAsync();
-        Assert.False(await access.CanAccess(null, c.Id, new(student.Id, false, false), false, default));
+        Assert.False(await access.CanAccess(c.Id, new(student.Id, false, false), false, default));
         enrollment.Rejoin(CodePath.Domain.Users.Entities.ClassJoinMethod.AdminAdded, now);
         c.SetStatus(CodePath.Domain.Users.Entities.ClassStatus.Archived, now); await accounts.SaveChangesAsync();
-        Assert.False(await access.CanAccess(null, c.Id, new(student.Id, false, false), false, default));
+        Assert.False(await access.CanAccess(c.Id, new(student.Id, false, false), false, default));
     }
     private sealed class ClassAccess : IJudgeAccess
     {
@@ -174,13 +195,13 @@ public class JudgePersistenceTests
         public bool Enrolled = true;
         private bool Allowed(Actor a, bool manage) => manage ? a.IsAdmin || a.Id == Teacher && a.IsTeacher : Enrolled && a.Id == Student;
         public Task<IReadOnlyList<JudgeScope>> Scopes(Actor a, bool manage, CancellationToken ct) => Task.FromResult<IReadOnlyList<JudgeScope>>(Allowed(a, manage) ? [new(ClassId, "Class A", "class")] : []);
-        public Task<bool> CanAccess(Guid? course, Guid? @class, Actor a, bool manage, CancellationToken ct) => Task.FromResult(course == null && @class == ClassId && Allowed(a, manage));
+        public Task<bool> CanAccess(Guid? @class, Actor a, bool manage, CancellationToken ct) => Task.FromResult(@class == ClassId && Allowed(a, manage));
     }
     private sealed class TestAccess : IJudgeAccess
     {
-        public static readonly Guid CourseId = Guid.NewGuid();
-        public Task<IReadOnlyList<JudgeScope>> Scopes(Actor actor, bool manage, CancellationToken ct) => Task.FromResult<IReadOnlyList<JudgeScope>>([new(CourseId, "Test course", "course")]);
-        public Task<bool> CanAccess(Guid? courseId, Guid? classId, Actor actor, bool manage, CancellationToken ct) => Task.FromResult(classId == null && (courseId == null || courseId == CourseId));
+        public static readonly Guid ClassId = Guid.NewGuid();
+        public Task<IReadOnlyList<JudgeScope>> Scopes(Actor actor, bool manage, CancellationToken ct) => Task.FromResult<IReadOnlyList<JudgeScope>>([new(ClassId, "Test class", "class")]);
+        public Task<bool> CanAccess(Guid? classId, Actor actor, bool manage, CancellationToken ct) => Task.FromResult(classId == null || classId == ClassId);
     }
     private sealed class FakeExecutor : ICodeExecutor
     {

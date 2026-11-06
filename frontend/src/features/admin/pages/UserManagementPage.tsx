@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { AdminUserItem } from '../types/admin.types';
 import { UserDetailModal } from '../components/UserDetailModal';
 import { UserFormModal } from '../components/UserFormModal';
+import { UserEditDrawer } from '../components/UserEditDrawer';
 import '../styles/personnel.css';
 import { adminTeacherApi, teacherError, type TeacherFilter, type TeacherFormData } from '../api/adminTeacherApi';
 import { useTeachers, useTeacherStats, useTeacherDetail, useFaculties, useTeacherMutations, useDebouncedSearch } from '../hooks/useTeachers';
@@ -13,7 +14,7 @@ import { adminStudentApi, studentError, type StudentFilter, type StudentFormData
 import { useStudents, useStudentStats, useStudentDetail, useStudentMutations } from '../hooks/useStudents';
 
 type PersonnelRole = 'Student' | 'Teacher';
-type ColumnId = 'code' | 'name' | 'gender' | 'birthday' | 'email' | 'department' | 'classes' | 'courses' | 'created' | 'phone' | 'status';
+type ColumnId = 'code' | 'name' | 'gender' | 'birthday' | 'email' | 'department' | 'classes' | 'created' | 'phone' | 'status';
 type Column = { id: ColumnId; label: string; width: number; min: number };
 type Panel = 'scope' | 'columns' | 'filters' | 'more' | 'add' | null;
 const statusLabels: Record<AdminUserItem['status'], string> = { Active: 'Đang hoạt động', Pending: 'Chờ phê duyệt', Disabled: 'Đã khóa', Rejected: 'Đã từ chối' };
@@ -27,7 +28,6 @@ const getColumns = (role: PersonnelRole): Column[] => [
   { id: 'email', label: 'Email trường', width: 250, min: 150 },
   { id: 'department', label: 'Khoa / Đơn vị', width: 245, min: 140 },
   { id: 'classes', label: role === 'Student' ? 'Số lớp tham gia' : 'Số lớp giảng dạy', width: 165, min: 130 },
-  { id: 'courses', label: role === 'Student' ? 'Học phần đăng ký' : 'Học phần phụ trách', width: 175, min: 135 },
   { id: 'created', label: 'Ngày tạo hồ sơ', width: 155, min: 120 },
   { id: 'phone', label: 'Số điện thoại', width: 155, min: 110 },
   { id: 'status', label: 'Trạng thái', width: 175, min: 135 },
@@ -40,7 +40,6 @@ const valueFor = (user: AdminUserItem, id: ColumnId): string | number => {
     case 'email': return user.email;
     case 'department': return user.department || '';
     case 'classes': return user.classesCount ?? 0;
-    case 'courses': return user.coursesCount ?? 0;
     case 'created': return user.createdAt;
     case 'phone': return user.phone || '';
     case 'status': return statusLabels[user.status];
@@ -69,6 +68,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
   const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null);
   const [editingUser, setEditingUser] = useState<AdminUserItem | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [drawerUser, setDrawerUser] = useState<AdminUserItem | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const actionsHeadingRef = useRef<HTMLTableCellElement>(null);
@@ -589,7 +589,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
             </thead>
             <tbody>
               {pageUsers.map((user, index) => (
-                <tr key={user.id} className={selectedIds.includes(user.id) ? 'is-selected' : ''} onDoubleClick={() => { setEditingUser(user); setFormOpen(true); }}>
+                <tr key={user.id} className={selectedIds.includes(user.id) ? 'is-selected' : ''} onDoubleClick={() => setDrawerUser(user)}>
                   <td className="personnel-checkbox-cell">
                     <input type="checkbox" aria-label={`Chọn ${user.fullName}`} checked={selectedIds.includes(user.id)} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...current, user.id] : current.filter((id) => id !== user.id))} />
                   </td>
@@ -622,7 +622,7 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
                       className="personnel-row-action-btn edit"
                       title="Chỉnh sửa hồ sơ"
                       aria-label="Chỉnh sửa hồ sơ"
-                      onClick={() => { setEditingUser(user); setFormOpen(true); }}
+                      onClick={() => setDrawerUser(user)}
                     >
                       <Edit3 size={15} />
                     </button>
@@ -688,6 +688,11 @@ export function UserManagementPage({ role }: { role: PersonnelRole }) {
         initialData={editingUser}
         onClose={() => { setFormOpen(false); setEditingUser(null); }}
         onSubmit={saveUser}
+      />
+      <UserEditDrawer
+        userId={drawerUser?.id ?? null}
+        open={!!drawerUser}
+        onClose={() => setDrawerUser(null)}
       />
 
       {deleteConfirm && (

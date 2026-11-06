@@ -1,6 +1,6 @@
 using CodePath.Application.Admin.Abstractions;
 using CodePath.Application.Auth.Abstractions;
-using CodePath.Application.Exercises.Abstractions;
+using CodePath.Application.Notifications.Abstractions;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Infrastructure.Auth.Options;
 using CodePath.Infrastructure.Auth.Services.Email;
@@ -8,17 +8,20 @@ using CodePath.Infrastructure.Auth.Services.LoginProtection;
 using CodePath.Infrastructure.Auth.Services.Otp;
 using CodePath.Infrastructure.Auth.Services.Passwords;
 using CodePath.Infrastructure.Auth.Services.Tokens;
-using CodePath.Infrastructure.CodeExecution;
 using CodePath.Infrastructure.Health;
+using CodePath.Infrastructure.Notifications;
 using CodePath.Infrastructure.Persistence;
 using CodePath.Infrastructure.Redis;
 using CodePath.Shared.Kernel.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -95,7 +98,7 @@ public static class InfrastructureDependencyInjection
         services.AddDbContext<AppDbContext>(options =>
             options.UseMySql(
                 connectionString,
-                ServerVersion.Create(8, 4, 0, ServerType.MySql),
+                ServerVersion.AutoDetect(connectionString),
                 mySqlOptions => mySqlOptions
                     .DefaultDataTypeMappings(mappings => mappings
                         .WithClrBoolean(MySqlBooleanType.TinyInt1)
@@ -104,27 +107,25 @@ public static class InfrastructureDependencyInjection
                     .MigrationsHistoryTable("__EFMigrationsHistory")));
 
         services.AddScoped<IAuthDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<CodePath.Application.Users.IUserRepository, CodePath.Infrastructure.Users.UserRepository>();
+        services.AddHttpClient<CodePath.Application.Users.IAvatarStorage, CodePath.Infrastructure.Users.CloudinaryAvatarStorage>(c => c.Timeout = TimeSpan.FromSeconds(30));
         services.AddScoped<IUsersDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<IAdminDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<CodePath.Application.Classes.IClassRepository>(sp => sp.GetRequiredService<AppDbContext>());
-        services.AddScoped<IExerciseDbContext>(sp => sp.GetRequiredService<AppDbContext>());
-        services.AddScoped<CodePath.Application.Teaching.Abstractions.ITeachingDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<INotificationDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IEventBus, OutboxEventBus>();
+        services.AddHostedService<OutboxWorker>();
+        services.AddHostedService<NotificationScheduledWorker>();
+        // Realtime defaults to a no-op; the API layer overrides with a SignalR-backed notifier.
+        services.TryAddScoped<IRealtimeNotifier, NullRealtimeNotifier>();
+        services.AddScoped<IUnreadCountCache, RedisNotificationCache>();
+        services.AddScoped<IDeadlineGuard, RedisDeadlineGuard>();
+                services.AddScoped<INotificationEmailRenderer, NotificationEmailRenderer>();
 
         services.AddHealthChecks()
             .AddCheck<MySqlHealthCheck>("mysql", tags: ["ready"])
             .AddCheck<RedisDependencyHealthCheck>("redis", tags: ["ready"]);
-
-        services.AddOptions<Judge0Options>()
-            .Bind(configuration.GetSection(Judge0Options.SectionName))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-        services.AddHttpClient<ICodeExecutionService, Judge0CodeExecutionService>((serviceProvider, client) =>
-        {
-            var options = serviceProvider.GetRequiredService<IOptions<Judge0Options>>().Value;
-            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
-            client.Timeout = TimeSpan.FromSeconds(options.RequestTimeoutSeconds);
-            client.MaxResponseContentBufferSize = 1_048_576;
-        });
 
         services.AddAuthInfrastructure(configuration, environment);
         return services;
@@ -207,6 +208,12 @@ public static class InfrastructureDependencyInjection
         services.AddSingleton<InMemoryLoginAttemptService>();
         services.AddSingleton<ILoginAttemptService, RedisLoginAttemptService>();
         services.AddScoped<IPasswordResetRateLimiter, RedisPasswordResetRateLimiter>();
+        // Stateless password reset tokens: keys persisted in MySQL so they survive restarts and
+        // are shared across instances (AppDbContext implements IDataProtectionKeyContext).
+        services.AddDataProtection()
+            .SetApplicationName("CodePath")
+            .PersistKeysToDbContext<AppDbContext>();
+        services.AddScoped<IPasswordResetTokenService, DataProtectionPasswordResetTokenService>();
         services.AddSingleton<IRedisHealthProbe, RedisHealthProbe>();
         services.AddHostedService<RefreshTokenCleanupService>();
 

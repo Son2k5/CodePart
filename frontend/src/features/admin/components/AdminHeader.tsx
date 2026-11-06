@@ -1,7 +1,8 @@
+import { NotificationBell } from '../../notifications/NotificationBell';
 import { AppSidebar } from '../../home/AppSidebar';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, PanelLeft, Search, Settings, Moon, Sun } from 'lucide-react';
+import { ChevronDown, LogOut, PanelLeft, Search, Settings, Moon, Sun } from 'lucide-react';
 import { useAuthStore } from '../../auth/store/authStore';
 import { useLogout } from '../../auth/hooks/useAuth';
 import { adminNavigation } from './AdminSidebar';
@@ -9,13 +10,12 @@ interface Props { onToggleSidebar: () => void; isMobileSidebarOpen: boolean; the
 export function AdminHeader({ onToggleSidebar, isMobileSidebarOpen, theme, onToggleTheme }: Props) {
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
-  const [panel, setPanel] = useState<'search' | 'notifications' | 'profile' | 'settings' | null>(null);
+  const [panel, setPanel] = useState<'search' | 'profile' | 'settings' | null>(null);
   const [query, setQuery] = useState('');
   const headerRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const profileRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<HTMLButtonElement>(null);
-  const bellRef = useRef<HTMLButtonElement>(null);
   const normalize = (value: string) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
   const results = adminNavigation.filter((item) => normalize(item.label).includes(normalize(query.trim())));
   useEffect(() => {
@@ -25,7 +25,6 @@ export function AdminHeader({ onToggleSidebar, isMobileSidebarOpen, theme, onTog
       if (event.key === 'Escape') {
         if (panel === 'settings') settingsRef.current?.focus();
         if (panel === 'profile') profileRef.current?.focus();
-        if (panel === 'notifications') bellRef.current?.focus();
         setPanel(null);
       }
     };
@@ -51,10 +50,7 @@ export function AdminHeader({ onToggleSidebar, isMobileSidebarOpen, theme, onTog
         {panel === 'settings' && <div id="admin-settings" className="absolute -right-24 top-11 w-60 rounded-xl border border-zinc-200 bg-white p-4 text-neutral-800 shadow-lg sm:right-0"><strong className="text-sm">Cài đặt giao diện</strong><button type="button" className="mt-3 flex w-full items-center justify-between rounded-lg bg-zinc-100 p-3 text-xs" onClick={onToggleTheme}><span>Chế độ {theme === 'dark' ? 'tối' : 'sáng'}</span>{theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}</button></div>}
       </div>
       <button type="button" className="admin-header-icon" title={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'} aria-pressed={theme === 'dark'} onClick={onToggleTheme}>{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
-      <div className="relative">
-        <button ref={bellRef} type="button" className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-zinc-600 hover:bg-[#f1f1f3]" aria-label="Thông báo" aria-expanded={panel === 'notifications'} aria-controls="admin-notifications" onClick={() => setPanel(panel === 'notifications' ? null : 'notifications')}><Bell size={18} /></button>
-        {panel === 'notifications' && <div id="admin-notifications" className="absolute top-[calc(100%+12px)] z-40 rounded-[10px] border border-zinc-200 bg-white text-neutral-800 shadow-[0_10px_30px_#00000012] -right-[43px] w-[270px] max-w-[calc(100vw-32px)] p-[17px] sm:right-0"><strong>Thông báo</strong><p className="m-0 p-2 text-xs leading-[1.7] text-neutral-500">Thông báo hệ thống chưa được kết nối.</p></div>}
-      </div>
+      <NotificationBell />
       <div className="relative">
         <button ref={profileRef} type="button" className="flex items-center gap-[7px] rounded-[7px] border-0 bg-transparent p-[3px] text-neutral-500 hover:bg-[#f1f1f3] [&>svg]:hidden sm:[&>svg]:block" aria-label="Tài khoản quản trị" aria-expanded={panel === 'profile'} aria-controls="admin-profile" onClick={() => setPanel(panel === 'profile' ? null : 'profile')}><span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#e8e3db] text-xs font-bold text-[#655947]">{user?.fullName?.trim().charAt(0).toUpperCase() || 'A'}</span><span className="hidden max-w-24 truncate text-xs font-medium text-neutral-700 sm:block xl:max-w-40">{user?.fullName || user?.email || 'Tài khoản'}</span><ChevronDown size={14} /></button>
         {panel === 'profile' && <div id="admin-profile" className="absolute top-[calc(100%+12px)] z-40 rounded-[10px] border border-zinc-200 bg-white text-neutral-800 shadow-[0_10px_30px_#00000012] right-0 w-[270px] max-w-[calc(100vw-32px)] p-[7px]"><div className="mb-[5px] flex flex-col gap-[5px] border-b border-[#ededed] p-2.5 [overflow-wrap:anywhere] [&_span]:text-xs [&_span]:text-neutral-500 [&_small]:text-xs [&_small]:text-neutral-500"><strong>{user?.fullName || 'Quản trị viên'}</strong><span>{user?.email}</span><small>Quản trị viên</small></div><button type="button" className="flex w-full items-center gap-2.5 rounded-[5px] border-0 bg-transparent px-[9px] py-[11px] text-left text-xs text-neutral-700 no-underline hover:bg-zinc-100" onClick={() => logout.mutate()} disabled={logout.isPending}><LogOut size={16} />{logout.isPending ? 'Đang đăng xuất...' : 'Đăng xuất'}</button></div>}

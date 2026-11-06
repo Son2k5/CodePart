@@ -43,6 +43,8 @@ public sealed class Topic
     public DateTime UpdatedAt { get; set; }
     public Guid RowVersion { get; set; } = Guid.NewGuid();
     public bool IsDeleted { get; set; }
+    // MySQL FULLTEXT column maintained on publish; powers topic search (fx_learning_topics_search).
+    public string SearchDocument { get; set; } = "";
     public void Publish(DateTime now)
     {
         PublishedContent = DraftContent; PublishedVersion++; Status = TopicStatus.Published;
@@ -91,6 +93,14 @@ public sealed class TopicProgress
     public DateTime LastAccessedAt { get; set; }
     public int ExercisePassedCount { get; set; }
     public int ExerciseTotalCount { get; set; }
+    // Per-student deadline override (merged from the former learning_extensions table).
+    public DateTime? DueExtensionAt { get; set; }
+    public string? ExtensionReason { get; set; }
+    public Guid? ExtensionGrantedBy { get; set; }
+    // Per-student note (merged from the former learning_notes table).
+    public string? NoteBody { get; set; }
+    public Guid? NoteBlockId { get; set; }
+    public DateTime? NoteUpdatedAt { get; set; }
 }
 public sealed class BlockProgress
 {
@@ -105,23 +115,12 @@ public sealed class BlockProgress
     public DateTime UpdatedAt { get; set; }
 }
 public sealed class ActivityDay { public Guid UserId { get; set; } public DateOnly Date { get; set; } }
-public sealed class ClassScoreConfig { public Guid ClassId { get; set; } public string Configuration { get; set; } = "{}"; }
-public sealed class StudentDeadlineExtension
-{
-    public Guid UserId { get; set; } public Guid TopicId { get; set; }
-    public DateTime NewDueAt { get; set; } public string Reason { get; set; } = ""; public Guid GrantedBy { get; set; }
-}
 public sealed class ScoreEntry
 {
     public Guid UserId { get; set; } public Guid ClassId { get; set; } public string Source { get; set; } = "Exercise";
     public Guid SourceRefId { get; set; } public Guid TopicId { get; set; } public decimal BasePoints { get; set; }
     public decimal PenaltyPercent { get; set; } public decimal LateByMinutes { get; set; } public decimal EffectivePoints { get; set; }
 }
-public sealed class TopicSearchIndex
-{
-    public Guid TopicId { get; set; } public Guid ClassId { get; set; } public string Document { get; set; } = ""; public DateTime UpdatedAt { get; set; }
-}
-public sealed class Badge { public string Code { get; set; } = ""; public string Name { get; set; } = ""; public string Description { get; set; } = ""; }
 public sealed class UserBadge
 {
     public Guid UserId { get; set; } public string BadgeCode { get; set; } = "";
@@ -133,9 +132,4 @@ public sealed class TopicComment
     public Guid Id { get; set; } = Guid.NewGuid(); public Guid TopicId { get; set; } public Guid ClassId { get; set; }
     public Guid UserId { get; set; } public Guid? ParentId { get; set; } public string Body { get; set; } = "";
     public bool IsPinned { get; set; } public bool IsDeleted { get; set; } public DateTime CreatedAt { get; set; } public DateTime? EditedAt { get; set; }
-}
-public sealed class TopicNote
-{
-    public Guid UserId { get; set; } public Guid TopicId { get; set; } public Guid? BlockId { get; set; }
-    public string Body { get; set; } = ""; public DateTime UpdatedAt { get; set; }
 }

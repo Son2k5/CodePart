@@ -11,7 +11,6 @@ import {
   Lock,
   Unlock,
   GraduationCap,
-  BookOpen,
   Award,
   Trash2,
   AlertTriangle,
@@ -215,19 +214,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Thông tin học tập & giảng dạy
             </h4>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-4 rounded-xl bg-sky-50/50 border border-sky-100 flex items-center gap-3">
-                <BookOpen className="w-5 h-5 text-sky-600" />
-                <div>
-                  <div className="text-slate-500 text-[11px]">
-                    {user.role === 'Teacher' ? 'Khóa học phụ trách' : 'Khóa học đã đăng ký'}
-                  </div>
-                  <div className="text-lg font-bold text-sky-900">
-                    {user.coursesCount || 0} khóa
-                  </div>
-                </div>
-              </div>
-
+            <div className="grid grid-cols-1 gap-3 text-xs">
               <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 flex items-center gap-3">
                 <GraduationCap className="w-5 h-5 text-indigo-600" />
                 <div>
@@ -246,20 +233,10 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             <h4 className="font-semibold">Lớp niên khóa phụ trách</h4>
             {user.managedClasses.length ? user.managedClasses.map(c => <p key={c.id}>{c.name} · {c.academicYear} · {c.studentCount} sinh viên</p>) : <p>Chưa được phân công.</p>}
           </section>}
-          {user.teachingCourses && <section className="text-xs space-y-2">
-            <h4 className="font-semibold">Học phần giảng dạy</h4>
-            {user.teachingCourses.length ? user.teachingCourses.map(c => <p key={c.id}>{c.subjectName} ({c.sectionCode}) · {c.semester} · {c.enrolledCount}/{c.capacity} sinh viên</p>) : <p>Chưa được phân công.</p>}
-          </section>}
           {user.enrolledClasses && (
             <section className="text-xs space-y-2">
               <h4 className="font-semibold">Lớp niên khóa tham gia</h4>
               {user.enrolledClasses.length ? user.enrolledClasses.map(c => <p key={c.id}>{c.name} · {c.academicYear}</p>) : <p>Chưa tham gia lớp nào.</p>}
-            </section>
-          )}
-          {user.enrolledCourses && (
-            <section className="text-xs space-y-2">
-              <h4 className="font-semibold">Học phần đã đăng ký</h4>
-              {user.enrolledCourses.length ? user.enrolledCourses.map(c => <p key={c.id}>{c.subjectName} ({c.sectionCode}) · {c.semester}{c.teacherName ? ` · GV: ${c.teacherName}` : ''}</p>) : <p>Chưa đăng ký học phần nào.</p>}
             </section>
           )}
           {/* Bio / Notes */}

@@ -35,6 +35,20 @@ x-python-service: &python-service
     start_period: 10s
 
 services:
+  mysql:
+    image: mysql:8
+    profiles: [mysql]
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-codepath-local-root-only}
+      MYSQL_DATABASE: codepath
+      MYSQL_USER: codepath
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-codepath-local-only}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--innodb-default-row-format=DYNAMIC"]
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - codepath-mysql-data:/var/lib/mysql
   redis:
     image: redis:7-alpine
     container_name: codepath-redis
@@ -106,6 +120,7 @@ services:
       - qdrant-local-data:/qdrant/storage
 
 volumes:
+  codepath-mysql-data:
   codepath-redis-data:
   qdrant-local-data:
 

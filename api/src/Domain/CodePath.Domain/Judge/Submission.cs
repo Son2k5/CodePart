@@ -5,7 +5,6 @@ public sealed class Submission
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid UserId { get; set; }
     public Guid ProblemId { get; set; }
-    public Guid? CourseId { get; set; }
     public Guid? ClassId { get; set; }
     public Guid? TopicId { get; set; }
     public DateTime? LearningProcessedAt { get; set; }

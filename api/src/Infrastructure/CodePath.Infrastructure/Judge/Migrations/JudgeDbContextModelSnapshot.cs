@@ -84,14 +84,18 @@ namespace CodePath.Infrastructure.Judge.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("binary(16)");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)")
+                        .HasDefaultValue("general");
+
                     b.Property<Guid?>("ClassId")
                         .HasColumnType("binary(16)");
 
                     b.Property<int>("ComparisonMode")
                         .HasColumnType("int");
-
-                    b.Property<Guid?>("CourseId")
-                        .HasColumnType("binary(16)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
@@ -190,9 +194,6 @@ namespace CodePath.Infrastructure.Judge.Migrations
 
                     b.Property<string>("CompileOutput")
                         .HasColumnType("longtext");
-
-                    b.Property<Guid?>("CourseId")
-                        .HasColumnType("binary(16)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");

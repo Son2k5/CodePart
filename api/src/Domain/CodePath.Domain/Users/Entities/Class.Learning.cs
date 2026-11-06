@@ -6,6 +6,8 @@ public sealed partial class Class
 {
     public ClassMode Mode { get; private set; } = ClassMode.Managed;
     public bool IsTemplate { get; private set; }
+    // Gradebook policy JSON (merged from the former learning_score_configs table).
+    public string? ScoreConfiguration { get; set; }
     public void SetMode(ClassMode mode, DateTime now)
     {
         if (!Enum.IsDefined(mode)) throw new DomainRuleViolationException("Invalid mode.", "VALIDATION_ERROR");

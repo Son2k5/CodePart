@@ -5,7 +5,7 @@ using CodePath.Shared.Kernel.Enums;
 
 namespace CodePath.Domain.Users.Entities;
 
-public sealed class User : BaseEntity
+public sealed partial class User : BaseEntity
 {
     public string FullName { get; private set; } = default!;
     public string Email { get; private set; } = default!;
@@ -27,8 +27,6 @@ public sealed class User : BaseEntity
     public Faculty? Faculty { get; private set; }
 
     public ICollection<Class> ManagedClasses { get; private set; } = new List<Class>();
-    public ICollection<Course> TeachingCourses { get; private set; } = new List<Course>();
-    public ICollection<Enrollment> Enrollments { get; private set; } = new List<Enrollment>();
 
     private User() { }
 

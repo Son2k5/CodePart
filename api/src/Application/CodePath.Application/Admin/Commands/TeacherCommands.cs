@@ -2,6 +2,8 @@ using CodePath.Application.Admin.Abstractions;
 using CodePath.Application.Admin.Dtos;
 using CodePath.Application.Auth;
 using CodePath.Application.Auth.Abstractions;
+using CodePath.Application.Notifications.Abstractions;
+using CodePath.Application.Notifications.Events;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auditing.Entities;
 using CodePath.Domain.Auditing.Enums;
@@ -99,7 +101,8 @@ public sealed class BulkDeleteTeachersCommandValidator : AbstractValidator<BulkD
 }
 
 internal sealed class TeacherCommandHandlers(IAdminDbContext db, IUsersDbContext users,
-    IAuthDbContext auth, IPasswordHasher hasher, TimeProvider clock, AdminStatusChangeService statusService) :
+    IAuthDbContext auth, IPasswordHasher hasher, TimeProvider clock, AdminStatusChangeService statusService,
+    IEventBus events) :
     IRequestHandler<CreateTeacherCommand, Result<Guid>>,
     IRequestHandler<UpdateTeacherCommand, Result<Guid>>,
     IRequestHandler<EnableUserCommand, Result<AdminUserStatusChangeDto>>,
@@ -171,6 +174,10 @@ internal sealed class TeacherCommandHandlers(IAdminDbContext db, IUsersDbContext
                 fromStatus = previous.ToString(), toStatus = u.Status.ToString(), role = "Teacher", revokedSessionCount = revoked });
             await db.AddAuditLogAsync(AuditLog.Create(r.ActorId,
                 r.Approve ? AuditAction.TeacherApproved : AuditAction.UserDisabled, u.Id, r.IpAddress, metadata, now), token);
+            // Stage notification integration events onto the outbox; they commit with the
+            // users.SaveChangesAsync below (same transaction), then drain asynchronously.
+            if (r.Approve) await events.PublishAsync(new TeacherAccountApprovedNotification(u.Id), token);
+            else if (previous == UserStatus.Pending) await events.PublishAsync(new TeacherAccountRejectedNotification(u.Id), token);
         }
         await users.SaveChangesAsync(token);
         return Result<int>.Success(targets.Count);

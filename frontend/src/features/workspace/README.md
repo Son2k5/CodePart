@@ -1,6 +1,6 @@
 # CodePath workspace
 
-Workspace mới thay màn hình `/problems/:id`, giữ nguyên danh sách bài và API hiện tại.
+Workspace mới thay màn hình `/practice/:id`, giữ nguyên danh sách bài và API hiện tại.
 Thiết kế light theme dùng xanh trời, xanh lá, vàng nhẹ như landing page, với mascot SVG **Mầm**.
 
 ## Chạy độc lập bằng mock
@@ -11,7 +11,7 @@ npm install
 npm run dev:workspace
 ```
 
-- Mở `http://localhost:5174/problems/demo-sum`.
+- Mở `http://localhost:5174/practice/demo-sum`.
 - Route có ngữ cảnh lớp: `http://localhost:5174/classes/demo-class/topics/nhap-xuat/problems/demo-sum`.
 - Bộ màu, mascot và trạng thái: `http://localhost:5174/design`.
 - Không cần backend, chứng chỉ HTTPS hay tài khoản. MSW cung cấp phiên học sinh giả chỉ trong chế độ development này.
@@ -23,7 +23,7 @@ npm run dev:workspace
 ## Chuyển sang backend thật
 
 Chạy `npm run dev` theo cấu hình HTTPS hiện có. Không đặt `VITE_USE_MOCK=true` trong môi trường này.
-Đăng nhập học sinh và mở `/problems/<GUID>` hoặc `/classes/<classId>/topics/<slug>/problems/<GUID>`.
+Đăng nhập học sinh và mở `/practice/<GUID>` hoặc `/classes/<classId>/topics/<slug>/problems/<GUID>`.
 Build production không bật MSW, kể cả khi đặt cờ mock.
 
 | Điểm nối | Thực hiện |

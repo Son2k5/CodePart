@@ -7,10 +7,10 @@ import '@fontsource/be-vietnam-pro/500.css';
 import '@fontsource/be-vietnam-pro/600.css';
 import '@fontsource/be-vietnam-pro/700.css';
 import { MemberHeader } from './MemberHeader';
-import { useClassesQuery, useClassMutation, type Page, type PublicClass } from '../classes/api';
+import { useClassesQuery, type Page, type PublicClass } from '../classes/api';
 
 const practiceOptions = [
-  { title: 'Luyện tập lập trình', description: 'Thử một bài toán nhỏ, chinh phục một kỹ năng mới.', icon: Code2, tone: 'blue', to: '/problems' },
+  { title: 'Luyện tập lập trình', description: 'Thử một bài toán nhỏ, chinh phục một kỹ năng mới.', icon: Code2, tone: 'blue', to: '/practice' },
   { title: 'Luyện trắc nghiệm', description: 'Ôn lại kiến thức qua những câu hỏi ngắn, dễ nhớ.', icon: ListChecks, tone: 'peach', to: null },
   { title: 'Luyện flashcard', description: 'Lật từng thẻ nhỏ, ghi nhớ thêm một điều hay.', icon: Layers3, tone: 'purple', to: null },
 ];
@@ -21,7 +21,6 @@ export function HomePage() {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'instant' });
   }, [hash]);
   const classes = useClassesQuery<Page<PublicClass>>('/classes/public', { page: 1, pageSize: 3 });
-  const join = useClassMutation();
   return <div className="member-home">
     <a className="fixed -top-24 left-4 z-[100] rounded-lg bg-white p-3 focus:top-3" href="#member-main">Đến nội dung chính</a>
     <MemberHeader />
@@ -47,7 +46,7 @@ export function HomePage() {
                 <span className="home-class-badge">{c.isEnrolled ? <><Check size={13} /> Đã tham gia</> : full ? 'Đã đủ học viên' : 'Đang mở · Miễn phí'}</span>
                 <span className="home-class-decoration" aria-hidden="true">✦</span>
               </div>
-              <div className="home-class-body"><h3>{c.name}</h3><p>{c.description || 'Cùng khám phá kiến thức và rèn luyện kỹ năng lập trình mỗi ngày.'}</p><span className="home-class-count"><Users size={15} /> {c.studentCount}{c.maxStudents !== null ? ` / ${c.maxStudents}` : ''} học viên</span><div className="home-class-bottom">{c.isEnrolled ? <Link className="home-button" to={`/classes/${c.id}/learning`}>Vào lớp học <ArrowRight size={16} /></Link> : <button type="button" className="home-button" disabled={full || join.isPending} onClick={() => join.mutate({ path: `/classes/${c.id}/join` })}>{full ? 'Lớp đã đầy' : join.isPending && join.variables?.path === `/classes/${c.id}/join` ? 'Đang tham gia…' : 'Tham gia lớp'}{!full && <ArrowRight size={16} />}</button>}</div></div>
+              <div className="home-class-body"><h3>{c.name}</h3><p>{c.description || 'Cùng khám phá kiến thức và rèn luyện kỹ năng lập trình mỗi ngày.'}</p><span className="home-class-count"><Users size={15} /> {c.studentCount}{c.maxStudents !== null ? ` / ${c.maxStudents}` : ''} học viên</span><div className="home-class-bottom">{c.isEnrolled ? <Link className="home-button" to={`/classes/${c.id}`}>Vào lớp học <ArrowRight size={16} /></Link> : <Link className="home-button" to={`/classes/${c.id}`}>{full ? 'Lớp đã đầy' : 'Xem thông tin lớp'}<ArrowRight size={16} /></Link>}</div></div>
             </article>;
           })}</div>}
         </section>

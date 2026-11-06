@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using CodePath.Application.Auth.Abstractions;
 using CodePath.Shared.Kernel.Common;
 using FluentValidation;
@@ -15,36 +13,37 @@ public sealed record ResetPasswordCommand(
 
 public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPasswordCommand>
 {
-    public ResetPasswordCommandValidator()
-    {
-        RuleFor(command => command.Token)
-            .NotEmpty()
-            .Length(64)
-            .Matches("^[A-Fa-f0-9]{64}$");
+    // Stateless Data Protection tokens are variable-length protected payloads; only presence is checkable here.
+    public ResetPasswordCommandValidator() =>
         RuleFor(command => command.NewPassword)
             .NotEmpty()
             .Must(PasswordPolicy.IsValid)
             .WithMessage("Password must be 12-128 characters and contain lowercase, uppercase, a number, and a special character.");
-    }
 }
 
 internal sealed class ResetPasswordCommandHandler(
     IAuthDbContext authDbContext,
     IPasswordHasher passwordHasher,
+    IPasswordResetTokenService tokenService,
     IEmailSender emailSender,
     TimeProvider timeProvider,
     ILogger<ResetPasswordCommandHandler> logger)
     : IRequestHandler<ResetPasswordCommand, Result<string>>
 {
+    private const string InvalidTokenMessage =
+        "The password reset link is invalid or has expired. Please request a new one.";
+
     public async Task<Result<string>> Handle(
         ResetPasswordCommand request,
         CancellationToken cancellationToken)
     {
-        var tokenHash = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(request.Token)));
+        if (!tokenService.TryValidate(request.Token, out var userId, out var fingerprint))
+            return Result<string>.Failure(InvalidTokenMessage, ErrorCodes.BadRequest);
+
         var passwordHash = passwordHasher.HashPassword(request.NewPassword);
-        var completion = await authDbContext.TryConsumePasswordResetTokenAsync(
-            tokenHash,
+        var completion = await authDbContext.TryResetPasswordAsync(
+            userId,
+            fingerprint,
             passwordHash,
             timeProvider.GetUtcNow().UtcDateTime,
             request.IpAddress,
@@ -52,9 +51,8 @@ internal sealed class ResetPasswordCommandHandler(
 
         if (completion is null)
         {
-            return Result<string>.Failure(
-                "The password reset token is invalid, expired, or has already been used.",
-                ErrorCodes.BadRequest);
+            // Fingerprint mismatch: the password changed since the link was issued, or the user no longer exists.
+            return Result<string>.Failure(InvalidTokenMessage, ErrorCodes.BadRequest);
         }
 
         try

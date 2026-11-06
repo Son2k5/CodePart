@@ -14,5 +14,8 @@ public enum AuditAction
     StudentApproved,
     StudentRejected,
     UserDeleted,
-    StudentDeleted
+    StudentDeleted,
+    NotificationBroadcast,
+    UserUpdated,
+    PasswordReset
 }

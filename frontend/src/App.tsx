@@ -100,10 +100,7 @@ const router = createBrowserRouter([
             element: <RoleGuard allowedRoles={['Teacher']} />,
             children: [
               { path: '/teacher', lazy: async () => ({ Component: (await import('./features/teacher/layouts/TeacherLayout')).TeacherLayout }), children: [
-                { index: true, element: <Navigate to="/teacher/courses" replace /> },
-                { path: 'courses', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherCoursesPage')).TeacherCoursesPage }) },
-                { path: 'courses/:id', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherCourseDetailPage')).TeacherCourseDetailPage }) },
-                { path: 'courses/:id/submissions', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherCourseDetailPage')).TeacherCourseDetailPage }) },
+                { index: true, element: <Navigate to="/teacher/classes" replace /> },
                 { path: 'classes', lazy: async () => ({ Component: (await import('./features/teacher/pages/TeacherClassesPage')).TeacherClassesPage }) },
               ] },
             ],
@@ -113,25 +110,21 @@ const router = createBrowserRouter([
             children: [
               { element: <MemberFooterLayout />, children: [
               { path: '/home', lazy: async () => ({ Component: (await import('./features/home/HomePage')).HomePage }) },
-              { path: '/courses', lazy: async () => ({ Component: (await import('./features/teacher/pages/StudentCoursesPage')).StudentCoursesPage }) },
               { path: '/classes', lazy: async () => ({ Component: (await import('./features/classes/PublicClassesPage')).PublicClassesPage }) },
+              { path: '/classes/:id', lazy: async () => ({ Component: (await import('./features/classes/ClassInfoPage')).ClassInfoPage }) },
               ] },
-              {
-                path: '/exercise/:slug',
-                lazy: async () => {
-                  const { ExercisePage } = await import('./features/online-judge/pages/ExercisePage');
-                  return { Component: ExercisePage };
-                },
-              },
             ],
           },
           { element: <RoleGuard allowedRoles={['Admin', 'Teacher']} />, children: [{ path: '/manage/problems', lazy: async () => ({ Component: (await import('./features/code-judge/JudgeAdminPage')).JudgeAdminPage }) }] },
           { element: <RoleGuard allowedRoles={['Student']} />, children: [
-            { element: <MemberFooterLayout />, children: [{ path: '/problems', lazy: async () => ({ Component: (await import('./features/code-judge/ProblemListPage')).ProblemListPage }) }] },
+            { element: <MemberFooterLayout />, children: [{ path: '/practice', lazy: async () => ({ Component: (await import('./features/code-judge/ProblemListPage')).ProblemListPage }) }] },
             { path: '/classes/:classId/topics/:slug/problems/:problemId', lazy: async () => ({ Component: (await import('./features/workspace/WorkspacePage')).WorkspacePage }) },
-            { path: '/problems/:id', lazy: async () => ({ Component: (await import('./features/workspace/WorkspacePage')).WorkspacePage }) },
+            { path: '/problems', element: <Navigate to="/practice" replace /> },
+            { path: '/problems/:id', element: <Navigate to="/practice" replace /> },
+            { path: '/practice/:id', lazy: async () => ({ Component: (await import('./features/workspace/WorkspacePage')).WorkspacePage }) },
           ] },
           { path: '/classes/:classId/learning', lazy: async () => ({ Component: (await import('./features/learning/LearningPage')).LearningPage }) },
+          { path: '/profile', lazy: async () => ({ Component: (await import('./features/profile/pages/ProfilePage')).ProfilePage }) },
           { path: '/dashboard', element: <DashboardRedirect /> },
         ],
       },

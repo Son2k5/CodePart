@@ -1,0 +1,5 @@
+- Feature modules under `src/features/<name>/` follow a uniform sub-structure of `api/`, `components/`, `pages/`, `hooks/`, `store/`, `types/`, and `styles/` folders, keeping feature-scoped concerns together.
+- Route components are loaded lazily via dynamic `import()` inside `createBrowserRouter` definitions rather than top-level imports, reducing initial bundle size.
+- API clients are thin wrappers around a shared `axiosInstance` from `src/lib/axios.ts`, which centralizes base URL, cookie-based refresh-token rotation, 401 retry, and session-expired handling.
+- User-facing messages and copy strings are extracted into `constants/messages.ts` instead of being hard-coded in components.
+- Authentication state is accessed exclusively through the Zustand `useAuthStore` hook, with `setAuth`/`clearAuth` also toggling the `codepath-has-session` localStorage indicator used across the app.

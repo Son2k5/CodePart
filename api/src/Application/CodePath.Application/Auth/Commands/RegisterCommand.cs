@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
 using CodePath.Application.Auth;
 using CodePath.Application.Auth.Abstractions;
+using CodePath.Application.Notifications.Abstractions;
+using CodePath.Application.Notifications.Events;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Users.Entities;
 using CodePath.Shared.Kernel.Common;
@@ -48,6 +50,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
     private readonly IPasswordHasher _passwordHasher;
     private readonly IOtpService _otpService;
     private readonly IEmailSender _emailSender;
+    private readonly IEventBus _events;
     private readonly ILogger<RegisterCommandHandler> _logger;
     private readonly TimeProvider _timeProvider;
 
@@ -56,6 +59,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
         IPasswordHasher passwordHasher,
         IOtpService otpService,
         IEmailSender emailSender,
+        IEventBus events,
         ILogger<RegisterCommandHandler> logger,
         TimeProvider timeProvider)
     {
@@ -63,6 +67,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
         _passwordHasher = passwordHasher;
         _otpService = otpService;
         _emailSender = emailSender;
+        _events = events;
         _logger = logger;
         _timeProvider = timeProvider;
     }
@@ -126,6 +131,11 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
                 ? User.CreateStudent(request.FullName, normalizedEmail, passwordHash, studentId!, utcNow)
                 : User.CreateTeacher(request.FullName, normalizedEmail, passwordHash, utcNow);
             await _usersDbContext.AddAsync(user, cancellationToken);
+
+            // A self-registered teacher is Pending; notify admins to approve. Staged on the outbox
+            // and committed with the user row below (same AppDbContext unit of work).
+            if (role == UserRole.Teacher)
+                await _events.PublishAsync(new NewTeacherPendingApprovalNotification(user.Id), cancellationToken);
 
             await _usersDbContext.SaveChangesAsync(cancellationToken);
             return Result<Guid>.Success(user.Id);

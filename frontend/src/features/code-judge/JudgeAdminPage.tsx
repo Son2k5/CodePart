@@ -7,7 +7,7 @@ import { judgeApi, judgeError, problemScope, scopeParams, type Problem, type Tes
 import { problemCategories } from './problemCategories';
 import { ScopePicker } from './ScopePicker';
 
-const empty: Partial<Problem> = { title: '', description: '', category: 'general', difficulty: 'Easy', timeLimitMs: 2000, memoryLimitMb: 256, points: 100, comparisonMode: 0, courseId: null,
+const empty: Partial<Problem> = { title: '', description: '', category: 'general', difficulty: 'Easy', timeLimitMs: 2000, memoryLimitMb: 256, points: 100, comparisonMode: 0,
   starterCodes: [{ language: 'python', template: '# Read from stdin and print the answer\n' }, { language: 'cpp', template: '#include <iostream>\nint main() {\n    return 0;\n}\n' }, { language: 'java', template: 'public class Main {\n    public static void main(String[] args) {\n    }\n}\n' }, { language: 'csharp', template: 'using System;\nclass Program { static void Main() { } }\n' }] };
 export function JudgeAdminPage() {
   const [search, setSearch] = useSearchParams();
@@ -20,7 +20,7 @@ export function JudgeAdminPage() {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState<number>();
   const [selected, setSelected] = useState<Submission>();
-  const [filters, setFilters] = useState({ problemId: '', courseId: '', userId: '', verdict: '' });
+  const [filters, setFilters] = useState({ problemId: '', userId: '', verdict: '' });
   const cache = useQueryClient();
   const problems = useQuery({ queryKey: ['judge-admin-list', page, scope], queryFn: () => judgeApi.list(true, page, scope) });
   const submissions = useQuery({ queryKey: ['judge-admin-submissions', page, filters, scope], queryFn: () => judgeApi.submissions({ ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)), ...scopeParams(scope), page }), enabled: tab === 'submissions' });
@@ -55,7 +55,7 @@ export function JudgeAdminPage() {
       {form && <section className="bg-white border border-[#e2e8f0] rounded-[20px] shadow-[0_3px_14px_#33415506] p-6 my-4"><div className="flex items-center justify-between gap-[14px] mb-4"><strong>{form.id ? 'Chỉnh sửa bài tập' : 'Bài tập mới'}</strong><button onClick={() => setForm(undefined)}>Đóng</button></div>{form.status === 'Published' && <p className="text-[#b75d57] font-medium my-2">Chuyển về nháp trước khi chỉnh sửa.</p>}
         <fieldset disabled={busy || form.status === 'Published'}><div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4 [&>label]:grid [&>label]:gap-2">
           <label>Tiêu đề<input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></label>
-          <label>Nơi đăng bài tập<ScopePicker scopes={scopes.data || []} value={problemScope(form)} disabled={!!form.id} onChange={v => setForm({ ...form, courseId: null, classId: null, ...scopeParams(v) })} /></label>
+          <label>Nơi đăng bài tập<ScopePicker scopes={scopes.data || []} value={problemScope(form)} disabled={!!form.id} onChange={v => setForm({ ...form, classId: null, ...scopeParams(v) })} /></label>
           <label>Dạng bài<select value={form.category || 'general'} onChange={e => setForm({ ...form, category: e.target.value })}>{problemCategories.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
           <label>Độ khó<select value={form.difficulty} onChange={e => setForm({ ...form, difficulty: e.target.value })}>{['Easy', 'Medium', 'Hard'].map(d => <option key={d}>{d}</option>)}</select></label>
           <label>So sánh output<select value={form.comparisonMode} onChange={e => setForm({ ...form, comparisonMode: Number(e.target.value) })}><option value={0}>Theo dòng</option><option value={1}>Theo token</option></select></label>

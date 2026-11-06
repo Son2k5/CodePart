@@ -22,9 +22,15 @@ public static partial class LearningEndpoints
         read.MapPost("/topics/{id:guid}/progress/heartbeat", async (Guid id, HeartbeatInput body, HttpContext h, ILearningService s, CancellationToken ct) => (await s.Progress(id, body, Actor(h), ct)).ToHttpResult()).RequireRateLimiting("learning-heartbeat");
         read.MapPost("/topics/{id:guid}/complete", async (Guid id, HttpContext h, ILearningService s, CancellationToken ct) => (await s.Progress(id, null, Actor(h), ct)).ToHttpResult());
         read.MapGet("/classes/{id:guid}/my-progress", async (Guid id, HttpContext h, ILearningService s, CancellationToken ct) => (await s.Report(id, Actor(h).Id, 1, 1, Actor(h), ct)).ToHttpResult());
+        read.MapGet("/classes/{classId:guid}/announcements", async (Guid classId, HttpContext h, IClassAnnouncementService s, CancellationToken ct) => (await s.List(classId, Actor(h), ct)).ToHttpResult());
         foreach (var action in new[] { "badges", "streak", "continue-learning" })
         { var captured = action; read.MapGet("/me/" + action, async (HttpContext h, ILearningService s, CancellationToken ct) => (await s.Personal(captured, Actor(h), ct)).ToHttpResult()); }
         var manage = app.MapGroup("/api").RequireAuthorization("CanManageClassContent").WithTags("Learning Management");
+        manage.MapPost("/classes/{classId:guid}/announcements", async (Guid classId, ClassAnnouncementInput body, HttpContext h, IClassAnnouncementService s, CancellationToken ct) =>
+            (await s.Create(classId, body, Actor(h), ct)).ToHttpResult())
+            .WithSummary("Post a class announcement; every enrolled student is notified");
+        manage.MapDelete("/classes/{classId:guid}/announcements/{id:guid}", async (Guid classId, Guid id, HttpContext h, IClassAnnouncementService s, CancellationToken ct) =>
+            (await s.Delete(classId, id, Actor(h), ct)).ToHttpResult());
         read.MapGet("/classes/{classId:guid}/chapters", async (Guid classId, HttpContext h, ILearningService s, CancellationToken ct) => (await s.Chapters(classId, null, "list", null, null, Actor(h), ct)).ToHttpResult());
         manage.MapPost("/classes/{classId:guid}/chapters", async (Guid classId, ChapterInput body, HttpContext h, ILearningService s, CancellationToken ct) => (await s.Chapters(classId, null, "create", body, null, Actor(h), ct)).ToHttpResult());
         manage.MapPut("/classes/{classId:guid}/chapters/{id:guid}", async (Guid classId, Guid id, ChapterInput body, HttpContext h, ILearningService s, CancellationToken ct) => (await s.Chapters(classId, id, "update", body, null, Actor(h), ct)).ToHttpResult());

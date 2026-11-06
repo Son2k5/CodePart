@@ -46,15 +46,12 @@ public sealed partial class AdminWorkflowSpecifications
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var now = DateTime.UtcNow;
             var managedClass = Class.Create("CS-2026", "2026-2030", facultyId, id, now);
-            var course = Course.Create("Algorithms", suffix[..10], "cpp", "2026-1", suffix[..8], id, now);
             var student = User.CreateStudent("Student", $"student-{suffix}@hanu.edu.vn", "hash", suffix, now);
             student.AssignToClass(managedClass.Id, now);
             db.Classes.Add(managedClass);
             db.ClassTeachers.Add(ClassTeacher.Create(managedClass.Id, id, id, now));
             db.ClassEnrollments.Add(ClassEnrollment.Create(managedClass.Id, student.Id, ClassJoinMethod.AdminAdded, now));
-            db.Courses.Add(course);
             db.Users.Add(student);
-            db.Enrollments.Add(Enrollment.Create(course.Id, student.Id, now));
             await db.SaveChangesAsync();
         }
         using var duplicate = await SendTeacherRequest(HttpMethod.Post, "/api/admin/teachers", token, body);

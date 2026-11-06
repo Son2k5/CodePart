@@ -16,6 +16,11 @@ public sealed record ClassDto(Guid Id, string Name, string Description, string? 
 // Separate public contract deliberately has no join-code fields.
 public sealed record PublicClassDto(Guid Id, string Name, string Description, string? Thumbnail,
     int? MaxStudents, int StudentCount, DateTime? StartDate, DateTime? EndDate, bool IsEnrolled);
+// Student-facing class info page: safe metadata only, never the join code.
+public sealed record ClassTeacherInfoDto(string FullName, string? AvatarUrl);
+public sealed record StudentClassInfoDto(Guid Id, string Name, string Description, string? Thumbnail,
+    string Status, string AccessType, int? MaxStudents, int StudentCount,
+    DateTime? StartDate, DateTime? EndDate, bool IsEnrolled, List<ClassTeacherInfoDto> Teachers);
 public sealed record ClassStudentDto(Guid Id, string FullName, string Email, DateTime JoinedAt, string JoinMethod);
 public sealed record ClassPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
 {
@@ -38,5 +43,6 @@ public interface IClassRepository
     Task<ClassDto?> DetailAsync(Guid id, CancellationToken ct);
     Task<ClassPage<ClassDto>> ListAsync(ClassFilter filter, CancellationToken ct);
     Task<ClassPage<PublicClassDto>> PublicAsync(ClassFilter filter, Guid student, CancellationToken ct);
+    Task<StudentClassInfoDto?> StudentInfoAsync(Guid id, Guid student, CancellationToken ct);
     Task<ClassPage<ClassStudentDto>> StudentsAsync(Guid id, ClassFilter filter, CancellationToken ct);
 }

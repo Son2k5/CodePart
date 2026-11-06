@@ -16,6 +16,8 @@ public sealed class ClassConfiguration : IEntityTypeConfiguration<Class>
         builder.Property(c => c.AccessType).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.JoinCode).HasMaxLength(8).UseCollation("ascii_bin").HasCharSet("ascii");
         builder.Property(c => c.RowVersion).IsConcurrencyToken().ValueGeneratedNever();
+        // Gradebook policy JSON merged from the former learning_score_configs table.
+        builder.Property(c => c.ScoreConfiguration).HasColumnType("json");
         // MySQL UNIQUE permits multiple NULLs; filtered indexes are not supported.
         builder.HasIndex(c => c.JoinCode).IsUnique().HasDatabaseName("ux_classes_join_code");
         builder.HasIndex(c => new { c.Status, c.AccessType });

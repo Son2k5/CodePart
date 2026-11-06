@@ -1,4 +1,6 @@
 using CodePath.Domain.Users.Entities;
+using CodePath.Application.Notifications.Abstractions;
+using CodePath.Application.Notifications.Events;
 using CodePath.Domain.Common.Exceptions;
 using CodePath.Shared.Kernel.Common;
 using FluentValidation;
@@ -63,7 +65,7 @@ public sealed class JoinClassValidator : AbstractValidator<JoinClassCommand>
     }
 }
 
-public sealed class ClassCommandHandlers(IClassRepository db, TimeProvider clock, JoinCodeGenerator codes) :
+public sealed class ClassCommandHandlers(IClassRepository db, TimeProvider clock, JoinCodeGenerator codes, IEventBus events) :
     IRequestHandler<SaveClassCommand, Result<Guid>>, IRequestHandler<ChangeClassCommand, Result<Guid>>,
     IRequestHandler<JoinClassCommand, Result<Guid>>, IRequestHandler<LeaveClassCommand, Result<Guid>>
 {
@@ -132,7 +134,10 @@ public sealed class ClassCommandHandlers(IClassRepository db, TimeProvider clock
             case ClassAction.RemoveStudent:
                 var enrollment = await db.EnrollmentAsync(c.Id, r.Subject!.Value, token);
                 if (enrollment == null) return Result<Guid>.Failure("Học sinh không có trong lớp.", "ENROLLMENT_NOT_FOUND");
-                enrollment.Remove(); break;
+                enrollment.Remove();
+                // Stage the removal alert; commits with the class unit of work below.
+                await events.PublishAsync(new RemovedFromCourseNotification(r.Subject.Value, c.Id), token);
+                break;
         }
         c.Changed(Now);
         await db.AuditAsync(r.Actor, c.Id, r.Action.ToString(), r.Subject, Now, token);
@@ -145,7 +150,12 @@ public sealed class ClassCommandHandlers(IClassRepository db, TimeProvider clock
         var e = await db.EnrollmentAsync(c.Id, r.Student, token);
         c.EnsureCanJoin(r.Code != null, await db.CountStudentsAsync(c.Id, token), e?.Status == ClassEnrollmentStatus.Active, Now);
         var method = r.Code == null ? ClassJoinMethod.Public : ClassJoinMethod.Code;
-        if (e == null) await db.AddEnrollmentAsync(ClassEnrollment.Create(c.Id, r.Student, method, Now), token);
+        if (e == null)
+        {
+            await db.AddEnrollmentAsync(ClassEnrollment.Create(c.Id, r.Student, method, Now), token);
+            // Notify the class teachers that a new student enrolled; commits with SaveAsync below.
+            await events.PublishAsync(new StudentJoinedCourseNotification(c.Id, r.Student), token);
+        }
         else e.Rejoin(method, Now);
         c.Changed(Now); await db.SaveAsync(token);
         return Result<Guid>.Success(c.Id);

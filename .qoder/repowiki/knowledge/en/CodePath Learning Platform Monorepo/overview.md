@@ -1,0 +1,1 @@
+Top-level monorepo wiring the ASP.NET backend, React frontend, and FastAPI AI/RAG service around a shared MySQL + Redis data plane with Docker Compose orchestration.

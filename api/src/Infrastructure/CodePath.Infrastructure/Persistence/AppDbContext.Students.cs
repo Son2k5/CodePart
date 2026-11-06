@@ -5,7 +5,6 @@ using CodePath.Application.Admin.Dtos;
 using CodePath.Domain.Auditing.Entities;
 using CodePath.Domain.Auditing.Enums;
 using CodePath.Domain.Users.Entities;
-using CodePath.Domain.Users.Enums;
 using CodePath.Shared.Kernel.Common;
 using CodePath.Shared.Kernel.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +18,6 @@ public partial class AppDbContext
         u.Faculty == null ? (u.Class == null ? null : u.Class.Faculty.Name) : u.Faculty.Name,
         u.Status.ToString(),
         ClassEnrollments.Count(e => e.StudentId == u.Id && e.Status == ClassEnrollmentStatus.Active) + (u.ClassId != null ? 1 : 0),
-        Enrollments.Count(e => e.StudentId == u.Id && e.Status == EnrollmentStatus.Active),
         u.EmailVerifiedAt, u.CreatedAt, u.LastLoginAt);
 
     async Task<OffsetPage<StudentDto>> IAdminDbContext.GetPagedStudentsAsync(StudentFilter filter, CancellationToken ct)
@@ -81,13 +79,7 @@ public partial class AppDbContext
             if (primaryClass is not null) enrolledClasses.Add(primaryClass);
         }
 
-        var enrolledCourses = await Enrollments.AsNoTracking()
-            .Where(e => e.StudentId == id && e.Status == EnrollmentStatus.Active)
-            .Select(e => new EnrolledCourseDto(e.Course.Id, e.Course.SubjectName, e.Course.SectionCode, e.Course.Semester,
-                e.Course.Teacher != null ? e.Course.Teacher.FullName : null))
-            .ToListAsync(ct);
-
-        return new(profile, enrolledClasses, enrolledCourses);
+        return new(profile, enrolledClasses);
     }
 
     Task<bool> IAdminDbContext.StudentCodeExistsAsync(string code, Guid? exceptId, CancellationToken ct) =>
@@ -104,10 +96,6 @@ public partial class AppDbContext
 
         if (target.Role == UserRole.Teacher)
         {
-            var hasCourses = await Courses.AnyAsync(c => c.TeacherId == targetUserId, ct);
-            if (hasCourses)
-                return Result<bool>.Failure("Không thể xóa giáo viên đang phụ trách học phần. Vui lòng chuyển giao học phần trước khi xóa.", ErrorCodes.Conflict);
-
             var hasClasses = await Classes.AnyAsync(c => c.TeacherId == targetUserId, ct);
             if (hasClasses)
                 return Result<bool>.Failure("Không thể xóa giáo viên đang chủ nhiệm lớp học. Vui lòng bàn giao lớp trước khi xóa.", ErrorCodes.Conflict);
@@ -117,26 +105,15 @@ public partial class AppDbContext
         else if (target.Role == UserRole.Student)
         {
             await ClassEnrollments.Where(e => e.StudentId == targetUserId).ExecuteDeleteAsync(ct);
-            await Enrollments.Where(e => e.StudentId == targetUserId).ExecuteDeleteAsync(ct);
-            await DeadlineExtensions.Where(d => d.UserId == targetUserId).ExecuteDeleteAsync(ct);
             await ScoreEntries.Where(s => s.UserId == targetUserId).ExecuteDeleteAsync(ct);
             await TopicProgress.Where(p => p.UserId == targetUserId).ExecuteDeleteAsync(ct);
             await BlockProgress.Where(p => p.UserId == targetUserId).ExecuteDeleteAsync(ct);
             await ActivityDays.Where(a => a.UserId == targetUserId).ExecuteDeleteAsync(ct);
             await UserBadges.Where(b => b.UserId == targetUserId).ExecuteDeleteAsync(ct);
             await TopicComments.Where(c => c.UserId == targetUserId).ExecuteDeleteAsync(ct);
-            await TopicNotes.Where(n => n.UserId == targetUserId).ExecuteDeleteAsync(ct);
-
-            var subIds = await Submissions.Where(s => s.StudentId == targetUserId).Select(s => s.Id).ToListAsync(ct);
-            if (subIds.Count > 0)
-            {
-                await SubmissionTestResults.Where(r => subIds.Contains(r.SubmissionId)).ExecuteDeleteAsync(ct);
-                await Submissions.Where(s => s.StudentId == targetUserId).ExecuteDeleteAsync(ct);
-            }
         }
 
         await RefreshTokens.Where(r => r.UserId == targetUserId).ExecuteDeleteAsync(ct);
-        await PasswordResetTokens.Where(p => p.UserId == targetUserId).ExecuteDeleteAsync(ct);
 
         // Remove audit logs referencing this user to prevent FK restrict violation
         await AuditLogs.Where(a => a.TargetUserId == targetUserId || a.ActorId == targetUserId).ExecuteDeleteAsync(ct);

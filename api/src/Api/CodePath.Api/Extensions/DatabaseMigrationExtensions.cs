@@ -32,7 +32,6 @@ public static class DatabaseMigrationExtensions
             var seedOptions = AdminSeedOptions.FromConfiguration(config);
 
             await AdminSeeder.SeedAdminsAsync(dbContext, passwordHasher, seedOptions, logger, timeProvider);
-            await ExerciseSeeder.SeedDemoExerciseAsync(dbContext, timeProvider, logger);
         }
         catch (Exception ex)
         {

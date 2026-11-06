@@ -16,7 +16,6 @@ public sealed class Problem
     public int Points { get; set; } = 100;
     public ComparisonMode ComparisonMode { get; set; }
     public ProblemStatus Status { get; set; }
-    public Guid? CourseId { get; set; }
     public Guid? ClassId { get; set; }
     public Guid CreatedBy { get; set; }
     public bool IsDeleted { get; set; }

@@ -52,8 +52,14 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .HasMaxLength(45)
                         .HasColumnType("varchar(45)");
 
+                    b.Property<string>("NewValue")
+                        .HasColumnType("json");
+
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("json");
 
                     b.Property<Guid>("TargetUserId")
                         .HasColumnType("binary(16)");
@@ -79,58 +85,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_audit_logs_target_occurred_at");
 
                     b.ToTable("audit_logs", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Auth.Entities.PasswordResetToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("RequestedByIp")
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)")
-                        .UseCollation("ascii_bin");
-
-                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("TokenHash"), "ascii");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("binary(16)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique()
-                        .HasDatabaseName("ux_password_reset_tokens_hash");
-
-                    b.HasIndex("UserId", "ExpiresAt")
-                        .HasDatabaseName("ix_password_reset_tokens_user_expiry");
-
-                    b.ToTable("password_reset_tokens", (string)null);
                 });
 
             modelBuilder.Entity("CodePath.Domain.Auth.Entities.RefreshToken", b =>
@@ -225,257 +179,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.Exercise", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("Constraints")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("CourseId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Difficulty")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("varchar(30)");
-
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("MemoryLimitKb")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("varchar(160)");
-
-                    b.Property<string>("StarterCode")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("TimeLimitMs")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("varchar(250)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CourseId");
-
-                    b.HasIndex("IsPublished")
-                        .HasDatabaseName("ix_exercises_published");
-
-                    b.HasIndex("Slug")
-                        .IsUnique()
-                        .HasDatabaseName("ux_exercises_slug");
-
-                    b.ToTable("exercises", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.ExerciseTestCase", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<Guid>("ExerciseId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("ExpectedOutput")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Explanation")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Input")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsSample")
-                        .HasColumnType("tinyint(1)");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExerciseId", "Order")
-                        .IsUnique()
-                        .HasDatabaseName("ux_exercise_test_cases_order");
-
-                    b.ToTable("exercise_test_cases", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.Submission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ExerciseId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime?>("GradedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<Guid?>("GradedBy")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("varchar(32)");
-
-                    b.Property<int?>("MemoryKb")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PassedTests")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("RuntimeMs")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SourceCode")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)");
-
-                    b.Property<Guid>("StudentId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("TeacherFeedback")
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)");
-
-                    b.Property<decimal?>("TeacherScore")
-                        .HasPrecision(4, 2)
-                        .HasColumnType("decimal(4,2)");
-
-                    b.Property<int>("TotalTests")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExerciseId");
-
-                    b.HasIndex("StudentId", "ExerciseId", "CreatedAt")
-                        .HasDatabaseName("ix_submissions_student_exercise_created");
-
-                    b.ToTable("submissions", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.SubmissionTestResult", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("ActualOutput")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("MemoryKb")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("RuntimeMs")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)");
-
-                    b.Property<Guid>("SubmissionId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid>("TestCaseId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TestCaseId");
-
-                    b.HasIndex("SubmissionId", "TestCaseId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_submission_test_results_case");
-
-                    b.ToTable("submission_test_results", (string)null);
-                });
-
             modelBuilder.Entity("CodePath.Domain.Learning.ActivityDay", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -535,26 +238,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("learning_assets", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Learning.Badge", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasMaxLength(40)
-                        .HasColumnType("varchar(40)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Code");
-
-                    b.ToTable("learning_badges", (string)null);
                 });
 
             modelBuilder.Entity("CodePath.Domain.Learning.BlockProgress", b =>
@@ -622,45 +305,48 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.ToTable("learning_chapters", (string)null);
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Learning.ClassScoreConfig", b =>
+            modelBuilder.Entity("CodePath.Domain.Learning.ClassAnnouncement", b =>
                 {
-                    b.Property<Guid>("ClassId")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("binary(16)");
 
-                    b.Property<string>("Configuration")
+                    b.Property<string>("Body")
                         .IsRequired()
-                        .HasColumnType("json");
+                        .HasMaxLength(5000)
+                        .HasColumnType("varchar(5000)");
 
-                    b.HasKey("ClassId");
-
-                    b.ToTable("learning_score_configs", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Learning.CloneReceipt", b =>
-                {
-                    b.Property<Guid>("TargetClassId")
+                    b.Property<Guid>("ClassId")
                         .HasColumnType("binary(16)");
-
-                    b.Property<string>("Key")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<string>("RequestHash")
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)");
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
 
-                    b.Property<string>("Result")
-                        .IsRequired()
-                        .HasColumnType("json");
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
 
-                    b.HasKey("TargetClassId", "Key");
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("longtext");
 
-                    b.ToTable("learning_clone_receipts", (string)null);
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassId", "CreatedAt");
+
+                    b.ToTable("learning_announcements", (string)null);
                 });
 
             modelBuilder.Entity("CodePath.Domain.Learning.RagIndexJob", b =>
@@ -819,30 +505,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.ToTable("learning_scores", (string)null);
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Learning.StudentDeadlineExtension", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid>("TopicId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid>("GrantedBy")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("NewDueAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("varchar(2000)");
-
-                    b.HasKey("UserId", "TopicId");
-
-                    b.ToTable("learning_extensions", (string)null);
-                });
-
             modelBuilder.Entity("CodePath.Domain.Learning.Topic", b =>
                 {
                     b.Property<Guid>("Id")
@@ -891,6 +553,11 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RowVersion")
                         .IsConcurrencyToken()
                         .HasColumnType("binary(16)");
+
+                    b.Property<string>("SearchDocument")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_0900_ai_ci");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -1005,30 +672,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.ToTable("learning_exercises", (string)null);
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Learning.TopicNote", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid>("TopicId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid?>("BlockId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(10000)
-                        .HasColumnType("varchar(10000)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("UserId", "TopicId");
-
-                    b.ToTable("learning_notes", (string)null);
-                });
-
             modelBuilder.Entity("CodePath.Domain.Learning.TopicProgress", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1046,13 +689,33 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Property<bool>("CompletedLate")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<DateTime?>("DueExtensionAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("ExercisePassedCount")
                         .HasColumnType("int");
 
                     b.Property<int>("ExerciseTotalCount")
                         .HasColumnType("int");
 
+                    b.Property<Guid?>("ExtensionGrantedBy")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("ExtensionReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
                     b.Property<DateTime>("LastAccessedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid?>("NoteBlockId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("NoteBody")
+                        .HasMaxLength(10000)
+                        .HasColumnType("varchar(10000)");
+
+                    b.Property<DateTime?>("NoteUpdatedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<int>("Status")
@@ -1065,30 +728,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "ClassId");
 
                     b.ToTable("learning_progress", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Learning.TopicSearchIndex", b =>
-                {
-                    b.Property<Guid>("TopicId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid>("ClassId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<string>("Document")
-                        .IsRequired()
-                        .HasColumnType("longtext")
-                        .UseCollation("utf8mb4_0900_ai_ci");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("TopicId");
-
-                    b.HasIndex("ClassId");
-
-                    b.ToTable("learning_search", (string)null);
                 });
 
             modelBuilder.Entity("CodePath.Domain.Learning.UserBadge", b =>
@@ -1109,6 +748,162 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "BadgeCode", "ClassId");
 
                     b.ToTable("learning_user_badges", (string)null);
+                });
+
+            modelBuilder.Entity("CodePath.Domain.Notifications.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("DedupKey")
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("json");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientId", "DedupKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notifications_recipient_dedup");
+
+                    b.HasIndex("RecipientId", "IsRead", "CreatedAt")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_notifications_recipient_read_created");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("CodePath.Domain.Notifications.Entities.NotificationPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<bool>("EmailEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("InAppEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("binary(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("ux_notification_preferences_user_type");
+
+                    b.ToTable("notification_preferences", (string)null);
+                });
+
+            modelBuilder.Entity("CodePath.Domain.Notifications.Entities.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("DeadLetteredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("varchar(512)");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("binary(16)");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("NextAttemptAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("json");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedAtUtc", "DeadLetteredAtUtc", "NextAttemptAtUtc")
+                        .HasDatabaseName("ix_outbox_messages_dispatch");
+
+                    b.ToTable("outbox_messages", (string)null);
                 });
 
             modelBuilder.Entity("CodePath.Domain.Users.Entities.Class", b =>
@@ -1177,6 +972,9 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("RowVersion")
                         .IsConcurrencyToken()
                         .HasColumnType("binary(16)");
+
+                    b.Property<string>("ScoreConfiguration")
+                        .HasColumnType("json");
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime(6)");
@@ -1276,131 +1074,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.ToTable("class_teachers", (string)null);
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Users.Entities.Course", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("JoinCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .UseCollation("utf8mb4_0900_as_cs");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<int>("MaxCapacity")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(60);
-
-                    b.Property<string>("SectionCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<string>("Semester")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SubjectName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("varchar(200)");
-
-                    b.Property<Guid>("TeacherId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("JoinCode")
-                        .IsUnique()
-                        .HasDatabaseName("ux_courses_join_code");
-
-                    b.HasIndex("TeacherId")
-                        .HasDatabaseName("ix_courses_teacher_id");
-
-                    b.ToTable("courses", (string)null);
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Users.Entities.Enrollment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<Guid>("CourseId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("CreatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<decimal?>("FinalScore")
-                        .HasPrecision(4, 2)
-                        .HasColumnType("decimal(4,2)");
-
-                    b.Property<bool?>("IsPassed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint(1)")
-                        .HasDefaultValue(false);
-
-                    b.Property<decimal?>("MidtermScore")
-                        .HasPrecision(4, 2)
-                        .HasColumnType("decimal(4,2)");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("StudentId")
-                        .HasColumnType("binary(16)");
-
-                    b.Property<decimal?>("TotalScore")
-                        .HasPrecision(4, 2)
-                        .HasColumnType("decimal(4,2)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StudentId")
-                        .HasDatabaseName("ix_enrollments_student_id");
-
-                    b.HasIndex("CourseId", "StudentId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_enrollments_course_student");
-
-                    b.ToTable("enrollments", (string)null);
-                });
-
             modelBuilder.Entity("CodePath.Domain.Users.Entities.Faculty", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1444,6 +1117,14 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("binary(16)");
 
+                    b.Property<string>("AcademicTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)");
+
                     b.Property<string>("Bio")
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)");
@@ -1457,6 +1138,9 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -1473,6 +1157,10 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
 
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("datetime(6)");
@@ -1492,6 +1180,7 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(50)");
 
                     b.Property<long>("SecurityVersion")
+                        .IsConcurrencyToken()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
                         .HasDefaultValue(1L);
@@ -1516,6 +1205,12 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasMaxLength(100)
                         .HasColumnType("varchar(100)");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.HasKey("Id");
 
@@ -1544,6 +1239,28 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_users_teacher_id");
 
                     b.ToTable("users", (string)null);
+
+                    MySqlEntityTypeBuilderExtensions.HasCharSet(b, "utf8mb4");
+                    MySqlEntityTypeBuilderExtensions.UseCollation(b, "utf8mb4_unicode_ci");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys");
                 });
 
             modelBuilder.Entity("CodePath.Domain.Auditing.Entities.AuditLog", b =>
@@ -1561,15 +1278,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Auth.Entities.PasswordResetToken", b =>
-                {
-                    b.HasOne("CodePath.Domain.Users.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("CodePath.Domain.Auth.Entities.RefreshToken", b =>
                 {
                     b.HasOne("CodePath.Domain.Auth.Entities.RefreshToken", null)
@@ -1584,64 +1292,16 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.Exercise", b =>
-                {
-                    b.HasOne("CodePath.Domain.Users.Entities.Course", "Course")
-                        .WithMany()
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Course");
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.ExerciseTestCase", b =>
-                {
-                    b.HasOne("CodePath.Domain.Exercises.Entities.Exercise", "Exercise")
-                        .WithMany("TestCases")
-                        .HasForeignKey("ExerciseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Exercise");
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.Submission", b =>
-                {
-                    b.HasOne("CodePath.Domain.Exercises.Entities.Exercise", "Exercise")
-                        .WithMany("Submissions")
-                        .HasForeignKey("ExerciseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("CodePath.Domain.Users.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Exercise");
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.SubmissionTestResult", b =>
-                {
-                    b.HasOne("CodePath.Domain.Exercises.Entities.Submission", "Submission")
-                        .WithMany("TestResults")
-                        .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("CodePath.Domain.Exercises.Entities.ExerciseTestCase", "TestCase")
-                        .WithMany()
-                        .HasForeignKey("TestCaseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Submission");
-
-                    b.Navigation("TestCase");
-                });
-
             modelBuilder.Entity("CodePath.Domain.Learning.Chapter", b =>
+                {
+                    b.HasOne("CodePath.Domain.Users.Entities.Class", null)
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CodePath.Domain.Learning.ClassAnnouncement", b =>
                 {
                     b.HasOne("CodePath.Domain.Users.Entities.Class", null)
                         .WithMany()
@@ -1680,6 +1340,24 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("TopicId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CodePath.Domain.Notifications.Entities.Notification", b =>
+                {
+                    b.HasOne("CodePath.Domain.Users.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("CodePath.Domain.Notifications.Entities.NotificationPreference", b =>
+                {
+                    b.HasOne("CodePath.Domain.Users.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -1744,36 +1422,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Navigation("Teacher");
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Users.Entities.Course", b =>
-                {
-                    b.HasOne("CodePath.Domain.Users.Entities.User", "Teacher")
-                        .WithMany("TeachingCourses")
-                        .HasForeignKey("TeacherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Teacher");
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Users.Entities.Enrollment", b =>
-                {
-                    b.HasOne("CodePath.Domain.Users.Entities.Course", "Course")
-                        .WithMany("Enrollments")
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("CodePath.Domain.Users.Entities.User", "Student")
-                        .WithMany("Enrollments")
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Course");
-
-                    b.Navigation("Student");
-                });
-
             modelBuilder.Entity("CodePath.Domain.Users.Entities.User", b =>
                 {
                     b.HasOne("CodePath.Domain.Users.Entities.Class", "Class")
@@ -1791,18 +1439,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Navigation("Faculty");
                 });
 
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.Exercise", b =>
-                {
-                    b.Navigation("Submissions");
-
-                    b.Navigation("TestCases");
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Exercises.Entities.Submission", b =>
-                {
-                    b.Navigation("TestResults");
-                });
-
             modelBuilder.Entity("CodePath.Domain.Users.Entities.Class", b =>
                 {
                     b.Navigation("ClassEnrollments");
@@ -1810,11 +1446,6 @@ namespace CodePath.Infrastructure.Persistence.Migrations
                     b.Navigation("Students");
 
                     b.Navigation("Teachers");
-                });
-
-            modelBuilder.Entity("CodePath.Domain.Users.Entities.Course", b =>
-                {
-                    b.Navigation("Enrollments");
                 });
 
             modelBuilder.Entity("CodePath.Domain.Users.Entities.Faculty", b =>
@@ -1826,11 +1457,7 @@ namespace CodePath.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("CodePath.Domain.Users.Entities.User", b =>
                 {
-                    b.Navigation("Enrollments");
-
                     b.Navigation("ManagedClasses");
-
-                    b.Navigation("TeachingCourses");
                 });
 #pragma warning restore 612, 618
         }

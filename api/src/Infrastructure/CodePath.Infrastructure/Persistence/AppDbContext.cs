@@ -1,12 +1,14 @@
 using System.Data;
+using System.Security.Cryptography;
 using CodePath.Application.Admin.Abstractions;
 using CodePath.Application.Auth.Abstractions;
-using CodePath.Application.Exercises.Abstractions;
+using CodePath.Application.Notifications.Abstractions;
 using CodePath.Application.Users.Abstractions;
 using CodePath.Domain.Auditing.Entities;
+using CodePath.Domain.Auditing.Enums;
 using CodePath.Domain.Auth.Entities;
-using CodePath.Domain.Exercises.Entities;
 using CodePath.Domain.Users.Entities;
+using CodePath.Infrastructure.Auth.Services.Tokens;
 using CodePath.Shared.Kernel.Enums;
 using CodePath.Shared.Kernel.Exceptions;
 using Microsoft.EntityFrameworkCore;
@@ -14,29 +16,20 @@ using MySqlConnector;
 
 namespace CodePath.Infrastructure.Persistence;
 
-public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDbContext, IExerciseDbContext
+public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, IAdminDbContext, INotificationDbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     // Auth Module Entities
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     // Admin/Audit Module Entities
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-
-    // Exercises / Online Judge Module Entities
-    public DbSet<Exercise> Exercises => Set<Exercise>();
-    public DbSet<ExerciseTestCase> ExerciseTestCases => Set<ExerciseTestCase>();
-    public DbSet<Submission> Submissions => Set<Submission>();
-    public DbSet<SubmissionTestResult> SubmissionTestResults => Set<SubmissionTestResult>();
 
     // Users Module Entities
     public DbSet<User> Users => Set<User>();
     public DbSet<Faculty> Faculties => Set<Faculty>();
     public DbSet<Class> Classes => Set<Class>();
-    public DbSet<Course> Courses => Set<Course>();
-    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
 
     // IAuthDbContext Implementation
     Task<RefreshToken?> IAuthDbContext.GetRefreshTokenAsync(string tokenHash, CancellationToken cancellationToken)
@@ -156,30 +149,9 @@ public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, 
         }, IsolationLevel.ReadCommitted, cancellationToken);
     }
 
-    async Task IAuthDbContext.ReplaceActivePasswordResetTokenAsync(
-        PasswordResetToken token,
-        DateTime utcNow,
-        CancellationToken cancellationToken)
-    {
-        await ExecuteWithRetryingTransactionAsync(async transactionCancellationToken =>
-        {
-            await PasswordResetTokens
-                .Where(existing => existing.UserId == token.UserId
-                    && existing.UsedAt == null
-                    && existing.ExpiresAt > utcNow)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(existing => existing.UsedAt, utcNow)
-                    .SetProperty(existing => existing.UpdatedAt, utcNow),
-                    transactionCancellationToken);
-
-            await PasswordResetTokens.AddAsync(token, transactionCancellationToken);
-            await base.SaveChangesAsync(transactionCancellationToken);
-            return true;
-        }, IsolationLevel.ReadCommitted, cancellationToken);
-    }
-
-    async Task<PasswordResetCompletion?> IAuthDbContext.TryConsumePasswordResetTokenAsync(
-        string tokenHash,
+    async Task<PasswordResetCompletion?> IAuthDbContext.TryResetPasswordAsync(
+        Guid userId,
+        string expectedFingerprint,
         string newPasswordHash,
         DateTime utcNow,
         string? ipAddress,
@@ -187,35 +159,21 @@ public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, 
     {
         return await ExecuteWithRetryingTransactionAsync(async transactionCancellationToken =>
         {
-            var token = await PasswordResetTokens
-                .AsNoTracking()
-                .SingleOrDefaultAsync(existing => existing.TokenHash == tokenHash, transactionCancellationToken);
-            if (token is null)
-                return null;
-
-            var claimed = await PasswordResetTokens
-                .Where(existing => existing.Id == token.Id
-                    && existing.UsedAt == null
-                    && existing.ExpiresAt > utcNow)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(existing => existing.UsedAt, utcNow)
-                    .SetProperty(existing => existing.UpdatedAt, utcNow)
-                    .SetProperty(existing => existing.UpdatedBy, ipAddress),
-                    transactionCancellationToken);
-            if (claimed != 1)
-                return null;
-
-            var user = await Users.FirstOrDefaultAsync(
-                existing => existing.Id == token.UserId,
-                transactionCancellationToken);
+            var user = await Users.FirstOrDefaultAsync(existing => existing.Id == userId, transactionCancellationToken);
             if (user is null)
+                return null;
+
+            // Stateless token replay guard: the token carries the fingerprint of the hash at issue time.
+            if (!PasswordFingerprint.Matches(user.PasswordHash, expectedFingerprint))
                 return null;
 
             user.ChangePassword(newPasswordHash, utcNow);
             user.IncrementSecurityVersion(utcNow);
+            AuditLogs.Add(AuditLog.Create(userId, AuditAction.PasswordReset, userId, ipAddress,
+                "{\"source\":\"stateless-reset\"}", utcNow));
 
             await RefreshTokens
-                .Where(refreshToken => refreshToken.UserId == user.Id && refreshToken.RevokedAt == null)
+                .Where(refreshToken => refreshToken.UserId == userId && refreshToken.RevokedAt == null)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(refreshToken => refreshToken.RevokedAt, utcNow)
                     .SetProperty(refreshToken => refreshToken.RevokedByIp, ipAddress)
@@ -232,13 +190,6 @@ public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, 
         DateTime expiredBeforeUtc,
         CancellationToken cancellationToken)
         => RefreshTokens
-            .Where(token => token.ExpiresAt < expiredBeforeUtc)
-            .ExecuteDeleteAsync(cancellationToken);
-
-    Task<int> IAuthDbContext.DeleteExpiredPasswordResetTokensAsync(
-        DateTime expiredBeforeUtc,
-        CancellationToken cancellationToken)
-        => PasswordResetTokens
             .Where(token => token.ExpiresAt < expiredBeforeUtc)
             .ExecuteDeleteAsync(cancellationToken);
 
@@ -321,24 +272,6 @@ public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, 
     Task IAdminDbContext.AddAuditLogAsync(AuditLog auditLog, CancellationToken cancellationToken)
         => AuditLogs.AddAsync(auditLog, cancellationToken).AsTask();
 
-    // IExerciseDbContext Implementation
-    Task<Exercise?> IExerciseDbContext.GetPublishedBySlugAsync(string slug, CancellationToken cancellationToken)
-        => Exercises.AsNoTracking()
-            .Include(exercise => exercise.Course)
-            .Include(exercise => exercise.TestCases.Where(test => test.IsSample))
-            .FirstOrDefaultAsync(exercise => exercise.Slug == slug && exercise.IsPublished, cancellationToken);
-
-    Task<Exercise?> IExerciseDbContext.GetPublishedByIdAsync(Guid exerciseId, CancellationToken cancellationToken)
-        => Exercises.AsNoTracking()
-            .Include(exercise => exercise.TestCases)
-            .FirstOrDefaultAsync(exercise => exercise.Id == exerciseId && exercise.IsPublished, cancellationToken);
-
-    Task IExerciseDbContext.AddSubmissionAsync(Submission submission, CancellationToken cancellationToken)
-        => Submissions.AddAsync(submission, cancellationToken).AsTask();
-
-    Task IExerciseDbContext.SaveChangesAsync(CancellationToken cancellationToken)
-        => SaveChangesAsync(cancellationToken);
-
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         EnqueueRagChanges();
@@ -351,6 +284,14 @@ public partial class AppDbContext : DbContext, IAuthDbContext, IUsersDbContext, 
         {
             throw new ConflictException("Email, Student ID, or unique record already exists.");
         }
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        ChangeTracker.DetectChanges();
+        foreach (var entry in ChangeTracker.Entries<User>().Where(e => e.State == EntityState.Modified))
+            entry.Property(u => u.Version).CurrentValue = checked(entry.Property(u => u.Version).OriginalValue + 1);
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

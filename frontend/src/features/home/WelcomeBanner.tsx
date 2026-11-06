@@ -4,10 +4,10 @@ import { ArrowRight, Pause, Play } from 'lucide-react';
 import { useAuthStore } from '../auth/store/authStore';
 
 const slides = [
-  { title: 'Một ngày mới,', emphasis: 'một điều hay để học', action: 'Tiếp tục hành trình của bạn', to: '/courses' },
-  { title: 'Viết từng dòng code,', emphasis: 'vững từng kỹ năng', action: 'Bắt đầu luyện tập', to: '/problems' },
+  { title: 'Một ngày mới,', emphasis: 'một điều hay để học', action: 'Tiếp tục hành trình của bạn', to: '/classes' },
+  { title: 'Viết từng dòng code,', emphasis: 'vững từng kỹ năng', action: 'Bắt đầu luyện tập', to: '/practice' },
   { title: 'Từ những điều nhỏ,', emphasis: 'đến ý tưởng lớn', action: 'Khám phá các lớp học', to: '/classes' },
-  { title: 'Thử sức mỗi ngày,', emphasis: 'tiến bộ từng bước', action: 'Chinh phục bài tập mới', to: '/problems' },
+  { title: 'Thử sức mỗi ngày,', emphasis: 'tiến bộ từng bước', action: 'Chinh phục bài tập mới', to: '/practice' },
 ];
 
 export function WelcomeBanner() {

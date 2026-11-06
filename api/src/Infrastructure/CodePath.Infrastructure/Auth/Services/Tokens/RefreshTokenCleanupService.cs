@@ -48,20 +48,10 @@ public sealed class RefreshTokenCleanupService : BackgroundService
             var deleted = await dbContext.DeleteExpiredRefreshTokensAsync(
                 _timeProvider.GetUtcNow().UtcDateTime.Subtract(_retention),
                 cancellationToken);
-            var deletedPasswordResetTokens = await dbContext.DeleteExpiredPasswordResetTokensAsync(
-                _timeProvider.GetUtcNow().UtcDateTime.Subtract(_retention),
-                cancellationToken);
 
             if (deleted > 0)
             {
                 _logger.LogInformation("Deleted {Count} expired refresh tokens outside the retention window.", deleted);
-            }
-
-            if (deletedPasswordResetTokens > 0)
-            {
-                _logger.LogInformation(
-                    "Deleted {Count} expired password reset tokens outside the retention window.",
-                    deletedPasswordResetTokens);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

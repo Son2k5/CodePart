@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: api_backend
+title: CodePath API Backend (ASP.NET Minimal API)
+scope:
+    - api/
+source_files: []
+depends_on: []
+related_to:
+    - path: ai_service
+    - path: frontend_app

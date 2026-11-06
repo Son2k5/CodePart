@@ -13,6 +13,11 @@ public sealed class AuditLog : BaseEntity
     public string? IpAddress { get; private set; }
     public string DataJson { get; private set; } = "{}";
 
+    public string? OldValue { get; private set; }
+    public string? NewValue { get; private set; }
+
+    public void SetChanges(string oldValue, string newValue) { OldValue = oldValue; NewValue = newValue; }
+
     private AuditLog() { }
 
     public static AuditLog Create(

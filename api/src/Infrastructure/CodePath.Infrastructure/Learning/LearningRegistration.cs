@@ -33,6 +33,7 @@ public static class LearningRegistration
         }
         services.AddScoped<ILearningExtras, LearningService>();
         services.AddScoped<ICurriculumService, LearningService>();
+        services.AddScoped<IClassAnnouncementService, LearningService>();
         services.AddScoped<ILearningAssets, LearningAssets>();
         services.AddHttpClient<IFileStorage, CloudinaryFileStorage>().ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddScoped<INotificationHandler<SubmissionJudgedEvent>, LearningJudgeHandler>();
